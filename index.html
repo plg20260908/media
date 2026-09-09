@@ -137,9 +137,9 @@ tr:hover{background:#f8fafc}
 .readonly{background:var(--bg2);color:var(--text2);cursor:not-allowed}
 
 /* ===== 生产计划表格交互 ===== */
-.plan-table-wrap{position:relative;overflow:auto;}
-.plan-table-wrap table{border-collapse:collapse;width:100%;table-layout:auto;}
-.plan-table-wrap th{position:relative;user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;}
+.plan-table-wrap{position:relative;overflow:auto;max-height:65vh;border:1px solid var(--border);border-radius:6px;}
+.plan-table-wrap table{border-collapse:separate;border-spacing:0;width:100%;table-layout:auto;}
+.plan-table-wrap th{position:sticky;top:0;z-index:5;background:var(--bg2);user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.08);}
 .plan-table-wrap th .col-resizer{position:absolute;right:0;top:0;width:6px;height:100%;cursor:col-resize;background:transparent;z-index:10;}
 .plan-table-wrap th .col-resizer:hover{background:rgba(59,130,246,0.3);}
 .plan-table-wrap td{padding:6px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -154,6 +154,26 @@ tr:hover{background:#f8fafc}
 .plan-toolbar{display:flex;gap:8px;align-items:center;padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;}
 .plan-toolbar button{padding:5px 12px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;}
 .plan-toolbar button:hover{background:var(--primary);color:#fff;border-color:var(--primary);}
+
+/* ===== 冻结列 ===== */
+.plan-table-wrap .frozen-col{position:sticky;z-index:4;background:var(--bg);box-shadow:2px 0 4px rgba(0,0,0,0.06);}
+.plan-table-wrap tbody td.frozen-col{z-index:4;}
+.plan-table-wrap thead th.frozen-col{z-index:6;background:var(--bg2);box-shadow:2px 2px 4px rgba(0,0,0,0.1);}
+/* ===== 可搜索下拉 ===== */
+.search-select{position:relative;display:inline-block;}
+.search-select input{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px;background:var(--bg);color:var(--text);cursor:pointer;}
+.search-select input:focus{outline:none;border-color:var(--primary);cursor:text;}
+.search-select .ss-dropdown{position:absolute;top:100%;left:0;right:0;max-height:240px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:100;display:none;}
+.search-select .ss-dropdown.show{display:block;}
+.search-select .ss-option{padding:7px 12px;font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.search-select .ss-option:hover{background:var(--primary);color:#fff;}
+.search-select .ss-option.selected{background:var(--bg2);font-weight:600;}
+.search-select .ss-empty{padding:10px 12px;font-size:12px;color:var(--text2);}
+/* ===== 统计筛选汇总 ===== */
+.stat-summary{display:flex;gap:16px;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;}
+.stat-summary .ss-item{font-size:13px;}
+.stat-summary .ss-item .ss-label{color:var(--text2);margin-right:6px;}
+.stat-summary .ss-item .ss-value{font-weight:600;color:var(--primary-dark);}
 </style>
 </head>
 <body>
@@ -2412,10 +2432,12 @@ return p;
 function keep2026(){const before=D.plans.length;D.plans=D.plans.filter(p=>String(p.prodDate||'').startsWith('2026'));const removed=before-D.plans.length;saveData(D);rp();toast(removed?('已删除 '+removed+' 条非2026数据'):'当前数据已全部为2026年');}
 
 let planView='order';
+let freezeCols=6;
 let planF={prod:'',status:'',from:'',to:''};
 function rPlan(a){
-a.innerHTML='<div class="card"><div class="ch"><h3>生产计划管理（订单跟踪 + 周计划）</h3><div class="ca"><button class="btn btnsm btnw" onclick="openPlanImport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>导入计划</button><button class="btn btnsm btnw" onclick="exportPlanExcel()" title="将当前筛选后的生产计划导出为Excel文件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>导出Excel</button><button class="btn btnsm btnw" onclick="keep2026()" title="删除所有非2026年的生产计划，仅保留2026">仅保留2026</button><button class="btn btnsm btnw" onclick="syncOrderDate()" title="按订单跟踪台账计划下达时间精准匹配（产品+规格+生产日期）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>同步订单日期</button><button class="btn btnsm" onclick="resetData()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>重置数据</button><button class="btn btnp btnsm" onclick="pf(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增计划</button></div></div><div class="tabs"><div class="tab '+(planView==='order'?'active':'')+'" onclick="sv(\'order\')">订单跟踪视图</div><div class="tab '+(planView==='week'?'active':'')+'" onclick="sv(\'week\')">周计划视图</div></div><div class="pf-bar" style="display:flex;gap:8px;align-items:center;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:12px;color:var(--text2);white-space:nowrap">筛选：</span><select id="pfProd" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px" onchange="renderPlanContent()"><option value="">全部产品</option>'+[...new Set(D.plans.map(p=>p.productName))].filter(Boolean).sort().map(p=>'<option value="'+p+'"'+(planF.prod===p?' selected':'')+'>'+p+'</option>').join('')+'</select><select id="pfStatus" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()"><option value="">全部状态</option>'+['计划中','生产中','待生产','已完成'].map(s=>'<option value="'+s+'"'+(planF.status===s?' selected':'')+'>'+s+'</option>').join('')+'</select><input type="date" id="pfFrom" value="'+planF.from+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()" title="生产日期起"><span style="color:var(--text2)">~</span><input type="date" id="pfTo" value="'+planF.to+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()" title="生产日期止"><button class="btn btnsm" onclick="planResetFilter()">重置</button></div><div id="planContent"></div></div>';
+a.innerHTML='<div class="card"><div class="ch"><h3>生产计划管理（订单跟踪 + 周计划）</h3><div class="ca"><button class="btn btnsm btnw" onclick="openPlanImport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>导入计划</button><button class="btn btnsm btnw" onclick="exportPlanExcel()" title="将当前筛选后的生产计划导出为Excel文件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>导出Excel</button><button class="btn btnsm btnw" onclick="keep2026()" title="删除所有非2026年的生产计划，仅保留2026">仅保留2026</button><button class="btn btnsm btnw" onclick="syncOrderDate()" title="按订单跟踪台账计划下达时间精准匹配（产品+规格+生产日期）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>同步订单日期</button><button class="btn btnsm" onclick="resetData()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>重置数据</button><button class="btn btnp btnsm" onclick="pf(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增计划</button></div></div><div class="tabs"><div class="tab '+(planView==='order'?'active':'')+'" onclick="sv(\'order\')">订单跟踪视图</div><div class="tab '+(planView==='week'?'active':'')+'" onclick="sv(\'week\')">周计划视图</div></div><div class="pf-bar" style="display:flex;gap:8px;align-items:center;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:12px;color:var(--text2);white-space:nowrap">筛选：</span><select id="pfProd" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px" onchange="renderPlanContent()"><option value="">全部产品</option>'+[...new Set(D.plans.map(p=>p.productName))].filter(Boolean).sort().map(p=>'<option value="'+p+'"'+(planF.prod===p?' selected':'')+'>'+p+'</option>').join('')+'</select><select id="pfStatus" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()"><option value="">全部状态</option>'+['计划中','生产中','待生产','已完成'].map(s=>'<option value="'+s+'"'+(planF.status===s?' selected':'')+'>'+s+'</option>').join('')+'</select><input type="date" id="pfFrom" value="'+planF.from+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()" title="生产日期起"><span style="color:var(--text2)">~</span><input type="date" id="pfTo" value="'+planF.to+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()" title="生产日期止"><span style="font-size:12px;color:var(--text2);white-space:nowrap;margin-left:8px">冻结列：</span><select id="pfFreeze" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="freezeCols=parseInt(this.value);renderPlanContent()"><option value="0">不冻结</option><option value="2">前2列</option><option value="4">前4列</option><option value="6" selected>前6列</option><option value="8">前8列</option></select><button class="btn btnsm" onclick="planResetFilter()">重置</button></div><div id="planContent"></div></div>';
 renderPlanContent();
+initSearchableSelects();
 }
 function planResetFilter(){planF={prod:'',status:'',from:'',to:''};rp();}
 function sv(v){planView=v;rp();}
@@ -2510,7 +2532,7 @@ h+='</tbody></table></div></div>';
 });
 if(!h)h='<div class="empty">没有符合筛选条件的计划</div>';
 c.innerHTML=h;
-if(planView==='order'){wrapPlanTable(c);initPlanTableInteraction(c);}
+if(planView==='order'){wrapPlanTable(c);initPlanTableInteraction(c);setTimeout(applyFreezeCols,50);}
 }else{
 // 按生产日期自动计算周次（周一到周日）
 function getWeekRange(d){
@@ -2533,7 +2555,7 @@ h+='</tbody></table></div></div>';
 });
 if(!h)h='<div class="empty">没有符合筛选条件的计划</div>';
 c.innerHTML=h;
-if(planView==='week'){wrapPlanTable(c);initPlanTableInteraction(c);}
+if(planView==='week'){wrapPlanTable(c);initPlanTableInteraction(c);setTimeout(applyFreezeCols,50);}
 }
 }
 
@@ -2633,6 +2655,139 @@ function showCtxMenu(e,items){
 }
 function removeCtxMenu(){document.querySelectorAll('.plan-ctx-menu').forEach(m=>m.remove());}
 
+
+// ===== 可搜索下拉（后置转换）=====
+function initSearchableSelects(ids){
+  const targetIds=ids||['pfProd','pfStatus','sfProd','sfCat'];
+  targetIds.forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel||sel.dataset.searchable)return;
+    sel.dataset.searchable='1';
+    const wrap=document.createElement('div');
+    wrap.className='search-select';
+    wrap.style.display='inline-block';
+    wrap.style.width='100%';
+    sel.parentNode.insertBefore(wrap,sel);
+    wrap.appendChild(sel);
+    sel.style.display='none';
+    // 创建input
+    const inp=document.createElement('input');
+    inp.type='text';
+    inp.placeholder=sel.options[0]?sel.options[0].text:'请选择或输入搜索';
+    inp.value=sel.value&&!String(sel.value).startsWith('__')?sel.options[sel.selectedIndex].text:'';
+    inp.readOnly=true;
+    inp.style.width='100%';
+    inp.style.boxSizing='border-box';
+    inp.onfocus=function(){this.removeAttribute('readonly');this.select();showSSDropdown(wrap,sel);};
+    inp.oninput=function(){filterSSDropdown(wrap,sel,this.value);};
+    inp.onblur=function(){setTimeout(()=>{const dd=wrap.querySelector('.ss-dropdown');if(dd)dd.classList.remove('show');this.setAttribute('readonly','true');},250);};
+    wrap.appendChild(inp);
+    // 创建下拉
+    const dd=document.createElement('div');
+    dd.className='ss-dropdown';
+    wrap.appendChild(dd);
+    buildSSOptions(wrap,sel,'');
+  });
+}
+function buildSSOptions(wrap,sel,filter){
+  const dd=wrap.querySelector('.ss-dropdown');
+  const inp=wrap.querySelector('input');
+  dd.innerHTML='';
+  const f=(filter||'').toLowerCase();
+  let count=0;
+  const specialOpts=[];
+  for(let i=0;i<sel.options.length;i++){
+    const opt=sel.options[i];
+    const txt=opt.text||'';
+    const isSpecial=String(opt.value).startsWith('__');
+    // 特殊选项（__开头）始终显示，不被搜索过滤
+    if(!isSpecial&&f&&!txt.toLowerCase().includes(f))continue;
+    if(isSpecial){specialOpts.push({opt,txt});continue;}
+    const d=document.createElement('div');
+    d.className='ss-option'+(sel.value===opt.value?' selected':'');
+    d.textContent=txt;
+    d.onmousedown=function(e){e.preventDefault();sel.value=opt.value;inp.value=txt;dd.classList.remove('show');if(sel.onchange)sel.onchange();else if(sel.getAttribute('onchange')){eval(sel.getAttribute('onchange'));}};
+    dd.appendChild(d);
+    count++;
+  }
+  // 特殊选项显示在底部，用分隔线
+  if(specialOpts.length>0){
+    const sep=document.createElement('div');
+    sep.style.cssText='border-top:1px solid var(--border);margin:4px 0;';
+    dd.appendChild(sep);
+    specialOpts.forEach(({opt,txt})=>{
+      const d=document.createElement('div');
+      d.className='ss-option';
+      d.style.cssText='color:var(--primary);font-weight:500;';
+      d.textContent=txt;
+      d.onmousedown=function(e){e.preventDefault();sel.value=opt.value;inp.value='';dd.classList.remove('show');if(sel.onchange)sel.onchange();else if(sel.getAttribute('onchange')){eval(sel.getAttribute('onchange'));}};
+      dd.appendChild(d);
+    });
+  }
+  if(count===0&&specialOpts.length===0){
+    const e=document.createElement('div');
+    e.className='ss-empty';
+    e.textContent='无匹配项';
+    dd.appendChild(e);
+  }
+}
+function showSSDropdown(wrap,sel){
+  const dd=wrap.querySelector('.ss-dropdown');
+  buildSSOptions(wrap,sel,'');
+  dd.classList.add('show');
+}
+function filterSSDropdown(wrap,sel,filter){
+  const dd=wrap.querySelector('.ss-dropdown');
+  buildSSOptions(wrap,sel,filter);
+  dd.classList.add('show');
+}
+
+
+// ===== 应用冻结列 =====
+function applyFreezeCols(){
+  const wraps=document.querySelectorAll('.plan-table-wrap');
+  wraps.forEach(wrap=>{
+    const table=wrap.querySelector('table');
+    if(!table)return;
+    // 清除旧的冻结样式
+    table.querySelectorAll('.frozen-col').forEach(el=>{
+      el.classList.remove('frozen-col');
+      el.style.left='';
+    });
+    const sel=document.getElementById('pfFreeze');
+    const n=sel?parseInt(sel.value):(typeof freezeCols!=='undefined'?freezeCols:6);
+    if(n<=0)return;
+    // 计算每列宽度（用thead的th）
+    const firstRow=table.querySelector('thead tr');
+    if(!firstRow)return;
+    const ths=firstRow.querySelectorAll('th');
+    const widths=[];
+    for(let i=0;i<Math.min(n,ths.length);i++){
+      widths.push(ths[i].getBoundingClientRect().width||ths[i].offsetWidth||80);
+    }
+    // 计算累计left偏移
+    const leftOffsets=[];
+    let acc=0;
+    for(let i=0;i<widths.length;i++){leftOffsets.push(acc);acc+=widths[i];}
+    // 应用到thead
+    for(let i=0;i<Math.min(n,ths.length);i++){
+      ths[i].classList.add('frozen-col');
+      ths[i].style.left=leftOffsets[i]+'px';
+    }
+    // 应用到tbody每行
+    const rows=table.querySelectorAll('tbody tr');
+    rows.forEach(row=>{
+      const tds=row.querySelectorAll('td');
+      for(let i=0;i<Math.min(n,tds.length);i++){
+        tds[i].classList.add('frozen-col');
+        tds[i].style.left=leftOffsets[i]+'px';
+      }
+    });
+  });
+}
+// 窗口大小变化时重新计算冻结列
+window.addEventListener('resize',()=>{clearTimeout(window._freezeTimer);window._freezeTimer=setTimeout(applyFreezeCols,200);});
+
 function productOptions(){return [...new Set(D.sops.map(s=>s.productName).concat(D.plans.map(p=>p.productName),(D.extraProds||[])))].filter(Boolean).sort();}
 let SPEC_EXTRA=[];
 function specOptions(prod){const extra=["3.5mL/管，10管/包","3.5mL/管，20管/包","3.5mL/管，20管/袋","55mm*10块/包","5mL/瓶，20瓶/盒","70mm*10块/包","90mm*10块/包","酚醇类，9mL，20瓶/盒","复合类，9mL，20瓶/盒","季铵盐类，9mL，20瓶/盒","脑心浸液肉汤，5mL/瓶，20瓶/盒","拭子型，3.5mL/管，20管/袋","树脂需氧瓶(成人)，25瓶/盒","树脂需氧瓶(成人)，50瓶/盒","树脂需氧瓶(儿童)，25瓶/盒","树脂需氧瓶(儿童)，50瓶/盒","树脂厌氧瓶，25瓶/盒","树脂厌氧瓶，50瓶/盒","氧化制剂类，9mL，20瓶/盒","液体，2mL/杯，50杯/盒","液体，2mL/管，50管/盒","营养肉汤，5mL/瓶，20瓶/盒"];const specs=[...new Set(D.plans.filter(p=>!prod||p.productName===prod).map(p=>p.spec))].filter(Boolean);return specs.length?[...new Set(specs.concat(extra,SPEC_EXTRA,D.extraSpecs||[]))]:[...new Set(extra.concat(SPEC_EXTRA,D.extraSpecs||[]))];}
@@ -2667,7 +2822,7 @@ h+='<div class="fg"><label>状态（自动生成）</label><input type="text" dk
 h+='<div class="fg ffull"><label>备注</label><textarea dk="remark" rows="2">'+(row.remark||'')+'</textarea></div>';
 h+='</div>';
 om((edit?'编辑':'新增')+'生产计划',h,'<button class="btn" onclick="cm()">取消</button><button class="btn btnp" onclick="psave('+i+')">'+(edit?'保存':'新增')+'</button>');
-setTimeout(autoQcCalc,0);
+setTimeout(function(){autoQcCalc();initSearchableSelects(['fprod','fspec','funit']);},50);
 }
 function updSpec(){const prod=$('fprod').value;const specs=specOptions(prod);$('fspec').innerHTML=specs.map(s=>'<option value="'+s+'">'+s+'</option>').join('')+'<option value="__spec_new__">＋ 编辑/新增规格…</option><option value="__spec_del__">－ 删除规格…</option>';}
 
@@ -2933,6 +3088,7 @@ alignStats();
 const prods=[...new Set(D.stats.map(s=>s.productName))].filter(Boolean).sort();
 a.innerHTML=statOverview()+'<div class="card"><div class="ch"><h3>生产统计管理</h3><div class="ca"><button class="btn btnsm btnw" onclick="syncFromPlan()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>从生产计划同步</button><button class="btn btnp btnsm" onclick="sf(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增</button></div></div><div class="st-filter" style="display:flex;gap:8px;align-items:center;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:12px;color:var(--text2);white-space:nowrap">筛选：</span><select id="sfProd" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px" onchange="renderStatTable()"><option value="">全部产品</option>'+prods.map(p=>'<option value="'+p+'"'+(statF.prod===p?' selected':'')+'>'+p+'</option>').join('')+'</select><select id="sfCat" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderStatTable()"><option value="">全部类别</option>'+['一类产品','二类产品','科研试剂'].map(c=>'<option value="'+c+'"'+(statF.cat===c?' selected':'')+'>'+c+'</option>').join('')+'</select><input type="date" id="sfFrom" value="'+statF.from+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderStatTable()" title="生产日期起"><span style="color:var(--text2)">~</span><input type="date" id="sfTo" value="'+statF.to+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderStatTable()" title="生产日期止"><button class="btn btnsm" onclick="statResetFilter()">重置</button></div><div id="statTable"></div></div>';
 renderStatTable();
+initSearchableSelects();
 }
 function statResetFilter(){statF={prod:'',cat:'',from:'',to:''};rp();}
 function renderStatTable(){
@@ -2943,7 +3099,12 @@ if(statF.prod)list=list.filter(s=>s.productName===statF.prod);
 if(statF.cat)list=list.filter(s=>s.category===statF.cat);
 if(statF.from)list=list.filter(s=>s.prodDate>=statF.from);
 if(statF.to)list=list.filter(s=>s.prodDate<=statF.to);
-box.innerHTML='<div class="tw"><table><thead><tr><th>批号</th><th>产品名称</th><th>类别</th><th>生产日期</th><th>计划产量</th><th>实际产量</th><th>合格率(%)</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
+// 计算筛选汇总
+const _sumBatch=list.length;
+const _sumPlan=list.reduce((s,x)=>s+(parseFloat(x.planQty)||0),0);
+const _sumActual=list.reduce((s,x)=>s+(parseFloat(x.actualQty)||0),0);
+const _sumHtml=(statF.prod||statF.cat||statF.from||statF.to)?('<div class="stat-summary"><div class="ss-item"><span class="ss-label">筛选结果：</span><span class="ss-value">'+_sumBatch+' 批次</span></div><div class="ss-item"><span class="ss-label">计划产量合计：</span><span class="ss-value">'+_sumPlan.toLocaleString()+'</span></div><div class="ss-item"><span class="ss-label">实际产量合计：</span><span class="ss-value">'+_sumActual.toLocaleString()+'</span></div>'+(statF.prod?'<div class="ss-item"><span class="ss-label">产品：</span><span class="ss-value">'+statF.prod+'</span></div>':'')+'</div>'):'';
+box.innerHTML=_sumHtml+'<div class="tw"><table><thead><tr><th>批号</th><th>产品名称</th><th>类别</th><th>生产日期</th><th>计划产量</th><th>实际产量</th><th>合格率(%)</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
 (list.length===0?'<tr><td colspan="9"><div class="empty">没有符合筛选条件的统计数据</div></td></tr>':
 list.map(s=>{const idx=D.stats.indexOf(s);return '<tr><td>'+s.batchNo+'</td><td>'+s.productName+'</td><td>'+ct(s.category)+'</td><td>'+s.prodDate+'</td><td>'+s.planQty+'</td><td>'+s.actualQty+'</td><td style="color:'+(s.passRate>=99?'var(--success)':s.passRate>=95?'var(--warning)':'var(--danger)')+'">'+s.passRate+'%</td><td>'+st(s.status)+'</td><td><a class="al" onclick="sf('+idx+')">编辑</a><a class="al d" onclick="sdel('+idx+')">删除</a></td></tr>';}).join(''))+
 '</tbody></table></div>';
