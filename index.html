@@ -2414,11 +2414,76 @@ function keep2026(){const before=D.plans.length;D.plans=D.plans.filter(p=>String
 let planView='order';
 let planF={prod:'',status:'',from:'',to:''};
 function rPlan(a){
-a.innerHTML='<div class="card"><div class="ch"><h3>生产计划管理（订单跟踪 + 周计划）</h3><div class="ca"><button class="btn btnsm btnw" onclick="openPlanImport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>导入计划</button><button class="btn btnsm btnw" onclick="keep2026()" title="删除所有非2026年的生产计划，仅保留2026">仅保留2026</button><button class="btn btnsm btnw" onclick="syncOrderDate()" title="按订单跟踪台账计划下达时间精准匹配（产品+规格+生产日期）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>同步订单日期</button><button class="btn btnsm" onclick="resetData()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>重置数据</button><button class="btn btnp btnsm" onclick="pf(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增计划</button></div></div><div class="tabs"><div class="tab '+(planView==='order'?'active':'')+'" onclick="sv(\'order\')">订单跟踪视图</div><div class="tab '+(planView==='week'?'active':'')+'" onclick="sv(\'week\')">周计划视图</div></div><div class="pf-bar" style="display:flex;gap:8px;align-items:center;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:12px;color:var(--text2);white-space:nowrap">筛选：</span><select id="pfProd" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px" onchange="renderPlanContent()"><option value="">全部产品</option>'+[...new Set(D.plans.map(p=>p.productName))].filter(Boolean).sort().map(p=>'<option value="'+p+'"'+(planF.prod===p?' selected':'')+'>'+p+'</option>').join('')+'</select><select id="pfStatus" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()"><option value="">全部状态</option>'+['计划中','生产中','待生产','已完成'].map(s=>'<option value="'+s+'"'+(planF.status===s?' selected':'')+'>'+s+'</option>').join('')+'</select><input type="date" id="pfFrom" value="'+planF.from+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()" title="生产日期起"><span style="color:var(--text2)">~</span><input type="date" id="pfTo" value="'+planF.to+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()" title="生产日期止"><button class="btn btnsm" onclick="planResetFilter()">重置</button></div><div id="planContent"></div></div>';
+a.innerHTML='<div class="card"><div class="ch"><h3>生产计划管理（订单跟踪 + 周计划）</h3><div class="ca"><button class="btn btnsm btnw" onclick="openPlanImport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>导入计划</button><button class="btn btnsm btnw" onclick="exportPlanExcel()" title="将当前筛选后的生产计划导出为Excel文件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>导出Excel</button><button class="btn btnsm btnw" onclick="keep2026()" title="删除所有非2026年的生产计划，仅保留2026">仅保留2026</button><button class="btn btnsm btnw" onclick="syncOrderDate()" title="按订单跟踪台账计划下达时间精准匹配（产品+规格+生产日期）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>同步订单日期</button><button class="btn btnsm" onclick="resetData()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>重置数据</button><button class="btn btnp btnsm" onclick="pf(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增计划</button></div></div><div class="tabs"><div class="tab '+(planView==='order'?'active':'')+'" onclick="sv(\'order\')">订单跟踪视图</div><div class="tab '+(planView==='week'?'active':'')+'" onclick="sv(\'week\')">周计划视图</div></div><div class="pf-bar" style="display:flex;gap:8px;align-items:center;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:12px;color:var(--text2);white-space:nowrap">筛选：</span><select id="pfProd" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px" onchange="renderPlanContent()"><option value="">全部产品</option>'+[...new Set(D.plans.map(p=>p.productName))].filter(Boolean).sort().map(p=>'<option value="'+p+'"'+(planF.prod===p?' selected':'')+'>'+p+'</option>').join('')+'</select><select id="pfStatus" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()"><option value="">全部状态</option>'+['计划中','生产中','待生产','已完成'].map(s=>'<option value="'+s+'"'+(planF.status===s?' selected':'')+'>'+s+'</option>').join('')+'</select><input type="date" id="pfFrom" value="'+planF.from+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()" title="生产日期起"><span style="color:var(--text2)">~</span><input type="date" id="pfTo" value="'+planF.to+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderPlanContent()" title="生产日期止"><button class="btn btnsm" onclick="planResetFilter()">重置</button></div><div id="planContent"></div></div>';
 renderPlanContent();
 }
 function planResetFilter(){planF={prod:'',status:'',from:'',to:''};rp();}
 function sv(v){planView=v;rp();}
+
+function exportPlanExcel(){
+  try{
+    // 获取当前筛选条件
+    let prod='',status='',from='',to='';
+    if($('pfProd')){prod=$('pfProd').value;status=$('pfStatus').value;from=$('pfFrom').value;to=$('pfTo').value;}
+    let plist=D.plans;
+    if(prod)plist=plist.filter(p=>p.productName===prod);
+    if(status)plist=plist.filter(p=>p.status===status);
+    if(from)plist=plist.filter(p=>p.prodDate>=from);
+    if(to)plist=plist.filter(p=>p.prodDate<=to);
+    
+    // 表头（与订单跟踪视图列顺序一致，对调后）
+    const headers=['订单→生产天数','订单日期','订单周次','生产日期','产品名称','规格','单位','计划数量','配制量(L)','成品数量','灌装合格','灌装不合格','包装成品','包装不合格','不合格品数','不合格率(%)','培养皿领用','培养皿损耗','标签领用','标签损耗','异常记录','备注','差异','状态'];
+    
+    // 计算辅助函数
+    const wr_=d=>{if(!d)return'';const date=new Date(d);const day=date.getDay()||7;const monday=new Date(date);monday.setDate(date.getDate()-day+1);const sunday=new Date(monday);sunday.setDate(monday.getDate()+6);const fd=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');return fd(monday)+'~'+fd(sunday);};
+    const odDays_=p=>{if(!p.orderDate||!p.prodDate)return'';const d1=new Date(p.orderDate),d2=new Date(p.prodDate);return Math.round((d2-d1)/86400000)+'天';};
+    
+    // 构建数据行
+    const rows=plist.map(p=>{
+      calcQty(p);
+      return [
+        odDays_(p),
+        p.orderDate||'',
+        wr_(p.orderDate)||(p.week||''),
+        p.prodDate||'',
+        p.productName||'',
+        p.spec||'',
+        p.unit||'',
+        p.planQty||0,
+        p.prepVol||0,
+        p.finishedQty||0,
+        p.ztQual||0,
+        p.ztDef||0,
+        p.bzDone||0,
+        p.bzDef||0,
+        p.defQty||0,
+        p.defRate!=null&&p.defRate!==0?(+p.defRate).toFixed(2):0,
+        p.ppGet||0,
+        p.ppLoss||0,
+        p.bqGet||0,
+        p.bqLoss||0,
+        p.anomaly==='/'?'':(p.anomaly||''),
+        p.remark||'',
+        p.diff||0,
+        p.status||''
+      ];
+    });
+    
+    // 生成Excel
+    const aoa=[headers,...rows];
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    // 设置列宽
+    ws['!cols']=[{wch:14},{wch:12},{wch:22},{wch:12},{wch:24},{wch:28},{wch:8},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:10},{wch:12},{wch:12},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:16},{wch:16},{wch:8},{wch:10}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'生产计划');
+    const fname='生产计划_'+new Date().toISOString().slice(0,10)+'.xlsx';
+    XLSX.writeFile(wb,fname);
+    toast('已导出 '+rows.length+' 条生产计划到Excel');
+  }catch(e){
+    toast('导出失败：'+e.message,true);
+  }
+}
+
 function renderPlanContent(){
 const c=$('planContent');if(!c)return;
 if($('pfProd')){planF.prod=$('pfProd').value;planF.status=$('pfStatus').value;planF.from=$('pfFrom').value;planF.to=$('pfTo').value;}
