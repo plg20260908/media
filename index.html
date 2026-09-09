@@ -139,8 +139,10 @@ tr:hover{background:#f8fafc}
 /* ===== 生产计划表格交互 ===== */
 .plan-table-wrap{position:relative;overflow:auto;max-height:65vh;border:1px solid var(--border);border-radius:6px;}
 .plan-table-wrap .tw{overflow:visible;}
+.plan-table-wrap thead th{will-change:transform;}
+.plan-table-wrap .frozen-col{will-change:transform;}
 .plan-table-wrap table{border-collapse:separate;border-spacing:0;width:100%;table-layout:auto;}
-.plan-table-wrap th{position:sticky;top:0;z-index:5;background:#f8fafc;user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.08);}
+.plan-table-wrap th{z-index:5;background:#f8fafc;user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.08);}
 .plan-table-wrap th .col-resizer{position:absolute;right:0;top:0;width:6px;height:100%;cursor:col-resize;background:transparent;z-index:10;}
 .plan-table-wrap th .col-resizer:hover{background:rgba(59,130,246,0.3);}
 .plan-table-wrap td{padding:6px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -157,8 +159,8 @@ tr:hover{background:#f8fafc}
 .plan-toolbar button:hover{background:var(--primary);color:#fff;border-color:var(--primary);}
 
 /* ===== 冻结列 ===== */
-.plan-table-wrap .frozen-col{position:sticky;z-index:4;background:#ffffff;box-shadow:2px 0 4px rgba(0,0,0,0.06);}
-.plan-table-wrap tbody td.frozen-col{z-index:4;}
+.plan-table-wrap .frozen-col{z-index:4;background:#ffffff;box-shadow:2px 0 4px rgba(0,0,0,0.06);}
+.plan-table-wrap tbody td.frozen-col{z-index:4;background:#ffffff;}
 .plan-table-wrap thead th.frozen-col{z-index:6;background:#f8fafc;box-shadow:2px 2px 4px rgba(0,0,0,0.1);}
 /* ===== 可搜索下拉 ===== */
 .search-select{position:relative;display:inline-block;}
@@ -2750,14 +2752,16 @@ function applyFreezeCols(){
   wraps.forEach(wrap=>{
     const table=wrap.querySelector('table');
     if(!table)return;
-    // 清除旧的冻结样式
+    // 清除旧的冻结样式和transform
     table.querySelectorAll('.frozen-col').forEach(el=>{
       el.classList.remove('frozen-col');
       el.style.left='';
+      el.style.transform='';
     });
+    table.querySelectorAll('thead th').forEach(th=>{th.style.transform='';});
     const sel=document.getElementById('pfFreeze');
     const n=sel?parseInt(sel.value):(typeof freezeCols!=='undefined'?freezeCols:6);
-    if(n<=0)return;
+    if(n<=0){bindTableScroll(wrap,0);return;}
     // 计算每列宽度（用thead的th）
     const firstRow=table.querySelector('thead tr');
     if(!firstRow)return;
@@ -2784,7 +2788,39 @@ function applyFreezeCols(){
         tds[i].style.left=leftOffsets[i]+'px';
       }
     });
+    // 绑定滚动监听
+    bindTableScroll(wrap,n);
   });
+}
+// JS滚动监听+transform实现表头固定和列冻结（最可靠方式）
+function bindTableScroll(wrap,freezeN){
+  if(wrap._scrollBound)return;
+  wrap._scrollBound=true;
+  wrap.addEventListener('scroll',function(){
+    const st=this.scrollTop, sl=this.scrollLeft;
+    const table=this.querySelector('table');
+    if(!table)return;
+    // 表头固定：所有th translateY
+    const ths=table.querySelectorAll('thead th');
+    ths.forEach(th=>{
+      if(th.classList.contains('frozen-col')){
+        // 表头+冻结列：同时translateX和Y
+        const left=parseFloat(th.style.left)||0;
+        th.style.transform='translate('+sl+'px,'+st+'px)';
+        th.style.left=left+'px';
+      }else{
+        // 仅表头：translateY
+        th.style.transform='translateY('+st+'px)';
+      }
+    });
+    // 冻结列：td.frozen-col translateX
+    if(freezeN>0){
+      const ftds=table.querySelectorAll('tbody td.frozen-col');
+      ftds.forEach(td=>{
+        td.style.transform='translateX('+sl+'px)';
+      });
+    }
+  },{passive:true});
 }
 // 窗口大小变化时重新计算冻结列
 window.addEventListener('resize',()=>{clearTimeout(window._freezeTimer);window._freezeTimer=setTimeout(applyFreezeCols,200);});
