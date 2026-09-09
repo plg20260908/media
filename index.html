@@ -135,6 +135,25 @@ tr:hover{background:#f8fafc}
 .bom-count{margin-left:auto;font-size:12px;opacity:0.9}
 .bom-group .tw{border-radius:0}
 .readonly{background:var(--bg2);color:var(--text2);cursor:not-allowed}
+
+/* ===== 生产计划表格交互 ===== */
+.plan-table-wrap{position:relative;overflow:auto;}
+.plan-table-wrap table{border-collapse:collapse;width:100%;table-layout:auto;}
+.plan-table-wrap th{position:relative;user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;}
+.plan-table-wrap th .col-resizer{position:absolute;right:0;top:0;width:6px;height:100%;cursor:col-resize;background:transparent;z-index:10;}
+.plan-table-wrap th .col-resizer:hover{background:rgba(59,130,246,0.3);}
+.plan-table-wrap td{padding:6px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.plan-table-wrap tr{position:relative;}
+.plan-table-wrap tr .row-resizer{position:absolute;left:0;bottom:0;width:100%;height:4px;cursor:row-resize;background:transparent;z-index:5;}
+.plan-table-wrap tr .row-resizer:hover{background:rgba(59,130,246,0.3);}
+.plan-table-wrap th.hide-col, .plan-table-wrap td.hide-col{display:none;}
+.plan-table-wrap tr.hide-row{display:none;}
+.plan-ctx-menu{position:fixed;z-index:9999;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:4px 0;min-width:160px;font-size:13px;}
+.plan-ctx-menu div{padding:8px 16px;cursor:pointer;}
+.plan-ctx-menu div:hover{background:var(--bg2);}
+.plan-toolbar{display:flex;gap:8px;align-items:center;padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.plan-toolbar button{padding:5px 12px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;}
+.plan-toolbar button:hover{background:var(--primary);color:#fff;border-color:var(--primary);}
 </style>
 </head>
 <body>
@@ -2420,12 +2439,13 @@ weeks.forEach(w=>{
 const wps=weekMap[w].sort((a,b)=>a.prodDate.localeCompare(b.prodDate)||(a.seq||0)-(b.seq||0));
 const total=wps.reduce((s,p)=>s+(p.planQty||0),0);
 const done=wps.filter(p=>p.status==='已完成').length;
-h+='<div class="week-group"><div class="week-header"><span><span class="tag tt">'+w+'</span></span><span style="font-weight:400;font-size:12px">共'+wps.length+'个批次 / 计划'+total.toLocaleString()+(wps[0]&&wps[0].unit?wps[0].unit:'')+' / 已完成'+done+'个</span></div><div class="tw"><table><thead><tr><th>生产日期</th><th>订单日期</th><th>订单周次</th><th>订单→生产天数</th><th>产品名称</th><th>规格</th><th>单位</th><th>计划数量</th><th>配制量(L)</th><th>成品数量</th><th>灌装合格</th><th>灌装不合格</th><th>包装成品</th><th>包装不合格</th><th>不合格品数</th><th>不合格率</th><th>培养皿领用</th><th>培养皿损耗</th><th>标签领用</th><th>标签损耗</th><th>异常记录</th><th>备注</th><th>差异</th><th>状态</th><th>操作</th></tr></thead><tbody>';
-wps.forEach(p=>{const idx=D.plans.indexOf(p);calcQty(p);h+='<tr><td>'+p.prodDate+'</td><td>'+(p.orderDate||'-')+'</td><td style="font-size:11.5px">'+(pw(p)||'-')+'</td><td style="font-weight:600;color:var(--text2)">'+odDays(p)+'</td><td>'+p.productName+'</td><td>'+p.spec+'</td><td>'+(p.unit||'-')+'</td><td>'+p.planQty+'</td><td>'+(p.prepVol||'-')+'</td><td>'+(p.finishedQty||0)+'</td><td>'+(p.ztQual||0)+'</td><td>'+(p.ztDef||0)+'</td><td>'+(p.bzDone||0)+'</td><td>'+(p.bzDef||0)+'</td><td>'+(p.defQty||0)+'</td><td>'+(p.defRate!=null&&p.defRate!==0?(+p.defRate).toFixed(2)+'%':'-')+'</td><td>'+(p.ppGet||0)+'</td><td>'+(p.ppLoss||0)+'</td><td>'+(p.bqGet||0)+'</td><td>'+(p.bqLoss||0)+'</td><td>'+(p.anomaly==='/'?'-':(p.anomaly||'-'))+'</td><td>'+(p.remark||'-')+'</td><td style="color:'+(p.diff<0?'var(--danger)':p.diff>0?'var(--success)':'var(--text2)')+';font-weight:600">'+(p.diff||0)+'</td><td>'+st(p.status)+'</td><td><a class="al" onclick="pf('+idx+')">编辑</a><a class="al d" onclick="pdel('+idx+')">删除</a></td></tr>'});
+h+='<div class="week-group"><div class="week-header"><span><span class="tag tt">'+w+'</span></span><span style="font-weight:400;font-size:12px">共'+wps.length+'个批次 / 计划'+total.toLocaleString()+(wps[0]&&wps[0].unit?wps[0].unit:'')+' / 已完成'+done+'个</span></div><div class="tw"><table><thead><tr><th>订单→生产天数</th><th>订单日期</th><th>订单周次</th><th>生产日期</th><th>产品名称</th><th>规格</th><th>单位</th><th>计划数量</th><th>配制量(L)</th><th>成品数量</th><th>灌装合格</th><th>灌装不合格</th><th>包装成品</th><th>包装不合格</th><th>不合格品数</th><th>不合格率</th><th>培养皿领用</th><th>培养皿损耗</th><th>标签领用</th><th>标签损耗</th><th>异常记录</th><th>备注</th><th>差异</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+wps.forEach(p=>{const idx=D.plans.indexOf(p);calcQty(p);h+='<tr><td style="font-weight:600;color:var(--text2)">'+odDays(p)+'</td><td>'+(p.orderDate||'-')+'</td><td style="font-size:11.5px">'+(pw(p)||'-')+'</td><td>'+p.prodDate+'</td><td>'+p.productName+'</td><td>'+p.spec+'</td><td>'+(p.unit||'-')+'</td><td>'+p.planQty+'</td><td>'+(p.prepVol||'-')+'</td><td>'+(p.finishedQty||0)+'</td><td>'+(p.ztQual||0)+'</td><td>'+(p.ztDef||0)+'</td><td>'+(p.bzDone||0)+'</td><td>'+(p.bzDef||0)+'</td><td>'+(p.defQty||0)+'</td><td>'+(p.defRate!=null&&p.defRate!==0?(+p.defRate).toFixed(2)+'%':'-')+'</td><td>'+(p.ppGet||0)+'</td><td>'+(p.ppLoss||0)+'</td><td>'+(p.bqGet||0)+'</td><td>'+(p.bqLoss||0)+'</td><td>'+(p.anomaly==='/'?'-':(p.anomaly||'-'))+'</td><td>'+(p.remark||'-')+'</td><td style="color:'+(p.diff<0?'var(--danger)':p.diff>0?'var(--success)':'var(--text2)')+';font-weight:600">'+(p.diff||0)+'</td><td>'+st(p.status)+'</td><td><a class="al" onclick="pf('+idx+')">编辑</a><a class="al d" onclick="pdel('+idx+')">删除</a></td></tr>'});
 h+='</tbody></table></div></div>';
 });
 if(!h)h='<div class="empty">没有符合筛选条件的计划</div>';
 c.innerHTML=h;
+if(planView==='order'){wrapPlanTable(c);initPlanTableInteraction(c);}
 }else{
 // 按生产日期自动计算周次（周一到周日）
 function getWeekRange(d){
@@ -2442,14 +2462,112 @@ weeks.forEach(w=>{
 const wps=weekMap[w].sort((a,b)=>a.prodDate.localeCompare(b.prodDate));
 const total=wps.reduce((s,p)=>s+(p.planQty||0),0);
 const done=wps.filter(p=>p.status==='已完成').length;
-h+='<div class="week-group"><div class="week-header"><span>'+w+'</span><span style="font-weight:400;font-size:12px">共'+wps.length+'个批次 / 计划'+total.toLocaleString()+(wps[0]&&wps[0].unit?wps[0].unit:'')+' / 已完成'+done+'个</span></div><div class="tw"><table><thead><tr><th>日期</th><th>订单日期</th><th>订单→生产天数</th><th>产品名称</th><th>规格</th><th>单位</th><th>计划产量</th><th>成品数量</th><th>灌装合格</th><th>灌装不合格</th><th>包装成品</th><th>包装不合格</th><th>不合格品数</th><th>不合格率</th><th>培养皿领用</th><th>培养皿损耗</th><th>标签领用</th><th>标签损耗</th><th>异常记录</th><th>备注</th><th>状态</th><th>操作</th></tr></thead><tbody>';
-wps.forEach(p=>{const idx=D.plans.indexOf(p);calcQty(p);h+='<tr><td>'+p.prodDate+'</td><td>'+(p.orderDate||'-')+'</td><td style="font-weight:600;color:var(--text2)">'+odDays(p)+'</td><td>'+p.productName+'</td><td>'+p.spec+'</td><td>'+(p.unit||'-')+'</td><td>'+p.planQty+'</td><td>'+(p.finishedQty||0)+'</td><td>'+(p.ztQual||0)+'</td><td>'+(p.ztDef||0)+'</td><td>'+(p.bzDone||0)+'</td><td>'+(p.bzDef||0)+'</td><td>'+(p.defQty||0)+'</td><td>'+(p.defRate!=null&&p.defRate!==0?(+p.defRate).toFixed(2)+'%':'-')+'</td><td>'+(p.ppGet||0)+'</td><td>'+(p.ppLoss||0)+'</td><td>'+(p.bqGet||0)+'</td><td>'+(p.bqLoss||0)+'</td><td>'+(p.anomaly==='/'?'-':(p.anomaly||'-'))+'</td><td>'+(p.remark||'-')+'</td><td>'+st(p.status)+'</td><td><a class="al" onclick="pf('+idx+')">编辑</a></td></tr>'});
+h+='<div class="week-group"><div class="week-header"><span>'+w+'</span><span style="font-weight:400;font-size:12px">共'+wps.length+'个批次 / 计划'+total.toLocaleString()+(wps[0]&&wps[0].unit?wps[0].unit:'')+' / 已完成'+done+'个</span></div><div class="tw"><table><thead><tr><th>订单→生产天数</th><th>订单日期</th><th>日期</th><th>产品名称</th><th>规格</th><th>单位</th><th>计划产量</th><th>成品数量</th><th>灌装合格</th><th>灌装不合格</th><th>包装成品</th><th>包装不合格</th><th>不合格品数</th><th>不合格率</th><th>培养皿领用</th><th>培养皿损耗</th><th>标签领用</th><th>标签损耗</th><th>异常记录</th><th>备注</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+wps.forEach(p=>{const idx=D.plans.indexOf(p);calcQty(p);h+='<tr><td style="font-weight:600;color:var(--text2)">'+odDays(p)+'</td><td>'+(p.orderDate||'-')+'</td><td>'+p.prodDate+'</td><td>'+p.productName+'</td><td>'+p.spec+'</td><td>'+(p.unit||'-')+'</td><td>'+p.planQty+'</td><td>'+(p.finishedQty||0)+'</td><td>'+(p.ztQual||0)+'</td><td>'+(p.ztDef||0)+'</td><td>'+(p.bzDone||0)+'</td><td>'+(p.bzDef||0)+'</td><td>'+(p.defQty||0)+'</td><td>'+(p.defRate!=null&&p.defRate!==0?(+p.defRate).toFixed(2)+'%':'-')+'</td><td>'+(p.ppGet||0)+'</td><td>'+(p.ppLoss||0)+'</td><td>'+(p.bqGet||0)+'</td><td>'+(p.bqLoss||0)+'</td><td>'+(p.anomaly==='/'?'-':(p.anomaly||'-'))+'</td><td>'+(p.remark||'-')+'</td><td>'+st(p.status)+'</td><td><a class="al" onclick="pf('+idx+')">编辑</a></td></tr>'});
 h+='</tbody></table></div></div>';
 });
 if(!h)h='<div class="empty">没有符合筛选条件的计划</div>';
 c.innerHTML=h;
+if(planView==='week'){wrapPlanTable(c);initPlanTableInteraction(c);}
 }
 }
+
+// ===== 生产计划表格交互功能 =====
+function wrapPlanTable(c){
+  const tables=c.querySelectorAll('table');
+  tables.forEach(t=>{
+    if(t.closest('.plan-table-wrap'))return;
+    const wrap=document.createElement('div');
+    wrap.className='plan-table-wrap';
+    t.parentNode.insertBefore(wrap,t);
+    wrap.appendChild(t);
+    // 添加工具栏
+    const tb=document.createElement('div');
+    tb.className='plan-toolbar';
+    tb.innerHTML='<button onclick="showAllCols(this)">显示所有列</button><button onclick="showAllRows(this)">显示所有行</button><span style="font-size:11px;color:var(--text2)">提示：拖拽列边界调列宽，拖拽行底调行高，右键列头/行隐藏</span>';
+    wrap.parentNode.insertBefore(tb,wrap);
+  });
+}
+function initPlanTableInteraction(c){
+  const wrap=c.querySelector('.plan-table-wrap');
+  if(!wrap)return;
+  const table=wrap.querySelector('table');
+  if(!table)return;
+  // 列宽拖拽
+  const ths=table.querySelectorAll('thead th');
+  ths.forEach((th,idx)=>{
+    if(th.querySelector('.col-resizer'))return;
+    const rz=document.createElement('div');
+    rz.className='col-resizer';
+    rz.addEventListener('mousedown',e=>{e.stopPropagation();e.preventDefault();startColResize(e,table,idx);});
+    th.appendChild(rz);
+    // 右键列头隐藏
+    th.addEventListener('contextmenu',e=>{e.preventDefault();showCtxMenu(e,[{label:'隐藏此列',action:()=>hideCol(table,idx)}]);});
+  });
+  // 行高拖拽 + 右键行隐藏
+  const trs=table.querySelectorAll('tbody tr');
+  trs.forEach((tr,ridx)=>{
+    if(tr.querySelector('.row-resizer'))return;
+    const rz=document.createElement('div');
+    rz.className='row-resizer';
+    rz.addEventListener('mousedown',e=>{e.stopPropagation();e.preventDefault();startRowResize(e,tr);});
+    tr.appendChild(rz);
+    tr.addEventListener('contextmenu',e=>{
+      if(e.target.closest('.row-resizer')||e.target.closest('.col-resizer'))return;
+      e.preventDefault();showCtxMenu(e,[{label:'隐藏此行',action:()=>{tr.classList.add('hide-row');}}]);
+    });
+  });
+}
+function startColResize(e,table,colIdx){
+  const startX=e.clientX;
+  const th=table.querySelectorAll('thead th')[colIdx];
+  const startW=th.offsetWidth;
+  function onMove(ev){const dw=ev.clientX-startX;th.style.width=Math.max(40,startW+dw)+'px';table.style.tableLayout='fixed';}
+  function onUp(){document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
+  document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
+}
+function startRowResize(e,tr){
+  const startY=e.clientY;
+  const startH=tr.offsetHeight;
+  function onMove(ev){const dh=ev.clientY-startY;tr.style.height=Math.max(24,startH+dh)+'px';}
+  function onUp(){document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
+  document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
+}
+function hideCol(table,colIdx){
+  const ths=table.querySelectorAll('thead th');
+  const trs=table.querySelectorAll('tbody tr');
+  if(ths[colIdx])ths[colIdx].classList.add('hide-col');
+  trs.forEach(tr=>{const tds=tr.querySelectorAll('td');if(tds[colIdx])tds[colIdx].classList.add('hide-col');});
+}
+function showAllCols(btn){
+  const wrap=btn.closest('.plan-toolbar').nextElementSibling;
+  if(!wrap)return;
+  wrap.querySelectorAll('.hide-col').forEach(el=>el.classList.remove('hide-col'));
+  wrap.querySelectorAll('th').forEach(th=>th.style.width='');
+  const t=wrap.querySelector('table');if(t)t.style.tableLayout='auto';
+}
+function showAllRows(btn){
+  const wrap=btn.closest('.plan-toolbar').nextElementSibling;
+  if(!wrap)return;
+  wrap.querySelectorAll('.hide-row').forEach(el=>el.classList.remove('hide-row'));
+  wrap.querySelectorAll('tbody tr').forEach(tr=>tr.style.height='');
+}
+function showCtxMenu(e,items){
+  removeCtxMenu();
+  const m=document.createElement('div');
+  m.className='plan-ctx-menu';
+  m.style.left=e.clientX+'px';m.style.top=e.clientY+'px';
+  items.forEach(it=>{
+    const d=document.createElement('div');
+    d.textContent=it.label;
+    d.onclick=()=>{it.action();removeCtxMenu();};
+    m.appendChild(d);
+  });
+  document.body.appendChild(m);
+  setTimeout(()=>document.addEventListener('click',removeCtxMenu,{once:true}),10);
+}
+function removeCtxMenu(){document.querySelectorAll('.plan-ctx-menu').forEach(m=>m.remove());}
+
 function productOptions(){return [...new Set(D.sops.map(s=>s.productName).concat(D.plans.map(p=>p.productName),(D.extraProds||[])))].filter(Boolean).sort();}
 let SPEC_EXTRA=[];
 function specOptions(prod){const extra=["3.5mL/管，10管/包","3.5mL/管，20管/包","3.5mL/管，20管/袋","55mm*10块/包","5mL/瓶，20瓶/盒","70mm*10块/包","90mm*10块/包","酚醇类，9mL，20瓶/盒","复合类，9mL，20瓶/盒","季铵盐类，9mL，20瓶/盒","脑心浸液肉汤，5mL/瓶，20瓶/盒","拭子型，3.5mL/管，20管/袋","树脂需氧瓶(成人)，25瓶/盒","树脂需氧瓶(成人)，50瓶/盒","树脂需氧瓶(儿童)，25瓶/盒","树脂需氧瓶(儿童)，50瓶/盒","树脂厌氧瓶，25瓶/盒","树脂厌氧瓶，50瓶/盒","氧化制剂类，9mL，20瓶/盒","液体，2mL/杯，50杯/盒","液体，2mL/管，50管/盒","营养肉汤，5mL/瓶，20瓶/盒"];const specs=[...new Set(D.plans.filter(p=>!prod||p.productName===prod).map(p=>p.spec))].filter(Boolean);return specs.length?[...new Set(specs.concat(extra,SPEC_EXTRA,D.extraSpecs||[]))]:[...new Set(extra.concat(SPEC_EXTRA,D.extraSpecs||[]))];}
@@ -2721,17 +2839,17 @@ function fsop(){rp()}
 function statOverview(){
 const now=new Date();const wk=wr(now);
 const mon=String(now.getFullYear())+'-'+String(now.getMonth()+1).padStart(2,'0');
-const plans=(D.plans||[]).filter(p=>p.finishedQty>0||parseFloat(p.bzDone)>0);
+const plans=(D.plans||[]).filter(p=>p.finishedQty>0||parseFloat(p.bzDone)>0);const batchPlans=(D.plans||[]).filter(p=>p.prodDate&&p.productName&&p.spec);
 const inW=p=>p.prodDate>=wk.start&&p.prodDate<=wk.end;
-const wl=plans.filter(inW);
-const ml=plans.filter(p=>String(p.prodDate||'').startsWith(mon));
+const wl=batchPlans.filter(inW);
+const ml=batchPlans.filter(p=>String(p.prodDate||'').startsWith(mon));
 const lwk=wr(new Date(now.getFullYear(),now.getMonth(),now.getDate()-7));
-const lwl=plans.filter(p=>p.prodDate>=lwk.start&&p.prodDate<=lwk.end);
+const lwl=batchPlans.filter(p=>p.prodDate>=lwk.start&&p.prodDate<=lwk.end);
 const lm0=new Date(now.getFullYear(),now.getMonth()-1,1);
 const lmon=String(lm0.getFullYear())+'-'+String(lm0.getMonth()+1).padStart(2,'0');
-const lml=plans.filter(p=>String(p.prodDate||'').startsWith(lmon));
+const lml=batchPlans.filter(p=>String(p.prodDate||'').startsWith(lmon));
 const yr=String(now.getFullYear());
-const yl=plans.filter(p=>String(p.prodDate||'').startsWith(yr));
+const yl=batchPlans.filter(p=>String(p.prodDate||'').startsWith(yr));
 const qtyOf=p=>parseFloat(p.bzDone)||0;
 const sum=l=>l.reduce((s,x)=>s+qtyOf(x),0);
 const wq=sum(wl),mq=sum(ml),lwq=sum(lwl),lmq=sum(lml),yq=sum(yl);
@@ -2755,7 +2873,7 @@ function statResetFilter(){statF={prod:'',cat:'',from:'',to:''};rp();}
 function renderStatTable(){
 const box=$('statTable');if(!box)return;
 if($('sfProd')){statF.prod=$('sfProd').value;statF.cat=$('sfCat').value;statF.from=$('sfFrom').value;statF.to=$('sfTo').value;}
-let list=D.stats;
+let list=D.stats.slice().sort((a,b)=>String(b.batchNo||'').localeCompare(String(a.batchNo||'')));
 if(statF.prod)list=list.filter(s=>s.productName===statF.prod);
 if(statF.cat)list=list.filter(s=>s.category===statF.cat);
 if(statF.from)list=list.filter(s=>s.prodDate>=statF.from);
@@ -2774,7 +2892,7 @@ let added=0,updated=0;
 completed.forEach(p=>{
 const batchNo=p.prodDate.replace(/-/g,'').slice(2)+String(p.seq||'01').padStart(2,'0');
 const exist=D.stats.find(s=>s.batchNo===batchNo);
-const passRate=p.finishedQty>0?Math.round((100-(parseFloat(p.defRate)||0)*100)*100)/100:0;
+const _finished=(parseFloat(p.ztQual)||0)+(parseFloat(p.ztDef)||0);const _bzDef=Math.max(0,(parseFloat(p.ztQual)||0)-(parseFloat(p.bzDone)||0));const _defQty=(parseFloat(p.ztDef)||0)+_bzDef;const _defRate=_finished>0?(_defQty/_finished*100):0;const passRate=_finished>0?Math.round((100-_defRate)*100)/100:0;
 if(exist){
 if(exist.planQty!==p.planQty||String(exist.actualQty)!==String(parseFloat(p.bzDone)||0))updated++;
 exist.planQty=p.planQty;exist.actualQty=parseFloat(p.bzDone)||0;exist.status=p.status;
