@@ -138,8 +138,9 @@ tr:hover{background:#f8fafc}
 
 /* ===== 生产计划表格交互 ===== */
 .plan-table-wrap{position:relative;overflow:auto;max-height:65vh;border:1px solid var(--border);border-radius:6px;}
+.plan-table-wrap .tw{overflow:visible;}
 .plan-table-wrap table{border-collapse:separate;border-spacing:0;width:100%;table-layout:auto;}
-.plan-table-wrap th{position:sticky;top:0;z-index:5;background:var(--bg2);user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.08);}
+.plan-table-wrap th{position:sticky;top:0;z-index:5;background:#f8fafc;user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.08);}
 .plan-table-wrap th .col-resizer{position:absolute;right:0;top:0;width:6px;height:100%;cursor:col-resize;background:transparent;z-index:10;}
 .plan-table-wrap th .col-resizer:hover{background:rgba(59,130,246,0.3);}
 .plan-table-wrap td{padding:6px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -156,9 +157,9 @@ tr:hover{background:#f8fafc}
 .plan-toolbar button:hover{background:var(--primary);color:#fff;border-color:var(--primary);}
 
 /* ===== 冻结列 ===== */
-.plan-table-wrap .frozen-col{position:sticky;z-index:4;background:var(--bg);box-shadow:2px 0 4px rgba(0,0,0,0.06);}
+.plan-table-wrap .frozen-col{position:sticky;z-index:4;background:#ffffff;box-shadow:2px 0 4px rgba(0,0,0,0.06);}
 .plan-table-wrap tbody td.frozen-col{z-index:4;}
-.plan-table-wrap thead th.frozen-col{z-index:6;background:var(--bg2);box-shadow:2px 2px 4px rgba(0,0,0,0.1);}
+.plan-table-wrap thead th.frozen-col{z-index:6;background:#f8fafc;box-shadow:2px 2px 4px rgba(0,0,0,0.1);}
 /* ===== 可搜索下拉 ===== */
 .search-select{position:relative;display:inline-block;}
 .search-select input{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px;background:var(--bg);color:var(--text);cursor:pointer;}
@@ -2523,7 +2524,7 @@ plist.forEach(p=>{const w=pw2(p);if(!weekMap[w])weekMap[w]=[];weekMap[w].push(p)
 const weeks=Object.keys(weekMap).sort((a,b)=>(a==='未分配周次'?1:0)-(b==='未分配周次'?1:0)||b.localeCompare(a));
 let h='';
 weeks.forEach(w=>{
-const wps=weekMap[w].sort((a,b)=>a.prodDate.localeCompare(b.prodDate)||(a.seq||0)-(b.seq||0));
+const wps=weekMap[w].sort((a,b)=>b.prodDate.localeCompare(a.prodDate)||(a.seq||0)-(b.seq||0));
 const total=wps.reduce((s,p)=>s+(p.planQty||0),0);
 const done=wps.filter(p=>p.status==='已完成').length;
 h+='<div class="week-group"><div class="week-header"><span><span class="tag tt">'+w+'</span></span><span style="font-weight:400;font-size:12px">共'+wps.length+'个批次 / 计划'+total.toLocaleString()+(wps[0]&&wps[0].unit?wps[0].unit:'')+' / 已完成'+done+'个</span></div><div class="tw"><table><thead><tr><th>订单→生产天数</th><th>订单日期</th><th>订单周次</th><th>生产日期</th><th>产品名称</th><th>规格</th><th>单位</th><th>计划数量</th><th>配制量(L)</th><th>成品数量</th><th>灌装合格</th><th>灌装不合格</th><th>包装成品</th><th>包装不合格</th><th>不合格品数</th><th>不合格率</th><th>培养皿领用</th><th>培养皿损耗</th><th>标签领用</th><th>标签损耗</th><th>异常记录</th><th>备注</th><th>差异</th><th>状态</th><th>操作</th></tr></thead><tbody>';
@@ -2546,7 +2547,7 @@ plist.forEach(p=>{const w=getWeekRange(p.prodDate);if(!weekMap[w])weekMap[w]=[];
 const weeks=Object.keys(weekMap).sort().reverse();
 let h='';
 weeks.forEach(w=>{
-const wps=weekMap[w].sort((a,b)=>a.prodDate.localeCompare(b.prodDate));
+const wps=weekMap[w].sort((a,b)=>b.prodDate.localeCompare(a.prodDate));
 const total=wps.reduce((s,p)=>s+(p.planQty||0),0);
 const done=wps.filter(p=>p.status==='已完成').length;
 h+='<div class="week-group"><div class="week-header"><span>'+w+'</span><span style="font-weight:400;font-size:12px">共'+wps.length+'个批次 / 计划'+total.toLocaleString()+(wps[0]&&wps[0].unit?wps[0].unit:'')+' / 已完成'+done+'个</span></div><div class="tw"><table><thead><tr><th>订单→生产天数</th><th>订单日期</th><th>日期</th><th>产品名称</th><th>规格</th><th>单位</th><th>计划产量</th><th>成品数量</th><th>灌装合格</th><th>灌装不合格</th><th>包装成品</th><th>包装不合格</th><th>不合格品数</th><th>不合格率</th><th>培养皿领用</th><th>培养皿损耗</th><th>标签领用</th><th>标签损耗</th><th>异常记录</th><th>备注</th><th>状态</th><th>操作</th></tr></thead><tbody>';
