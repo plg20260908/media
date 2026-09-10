@@ -137,7 +137,8 @@ tr:hover{background:#f8fafc}
 .readonly{background:var(--bg2);color:var(--text2);cursor:not-allowed}
 
 /* ===== 生产计划表格交互 ===== */
-.plan-table-wrap{position:relative;overflow:auto;max-height:65vh;border:1px solid var(--border);border-radius:6px;}
+#planContent{max-height:calc(100vh - 280px);overflow:auto;border:1px solid var(--border);border-radius:6px;position:relative;}
+.plan-table-wrap{position:relative;}
 .plan-table-wrap .tw{overflow:visible;}
 .plan-table-wrap thead th{will-change:transform;}
 .plan-table-wrap .frozen-col{will-change:transform;}
@@ -2535,7 +2536,7 @@ h+='</tbody></table></div></div>';
 });
 if(!h)h='<div class="empty">没有符合筛选条件的计划</div>';
 c.innerHTML=h;
-if(planView==='order'){wrapPlanTable(c);initPlanTableInteraction(c);setTimeout(applyFreezeCols,50);}
+if(planView==='order'){wrapPlanTable(c);initPlanTableInteraction(c);setTimeout(function(){applyFreezeCols();},50);}
 }else{
 // 按生产日期自动计算周次（周一到周日）
 function getWeekRange(d){
@@ -2558,7 +2559,7 @@ h+='</tbody></table></div></div>';
 });
 if(!h)h='<div class="empty">没有符合筛选条件的计划</div>';
 c.innerHTML=h;
-if(planView==='week'){wrapPlanTable(c);initPlanTableInteraction(c);setTimeout(applyFreezeCols,50);}
+if(planView==='week'){wrapPlanTable(c);initPlanTableInteraction(c);setTimeout(function(){applyFreezeCols();},50);}
 }
 }
 
@@ -2788,38 +2789,32 @@ function applyFreezeCols(){
         tds[i].style.left=leftOffsets[i]+'px';
       }
     });
-    // 绑定滚动监听
-    bindTableScroll(wrap,n);
   });
+  // 绑定统一滚动容器的滚动监听
+  bindPlanScroll();
 }
-// JS滚动监听+transform实现表头固定和列冻结（最可靠方式）
-function bindTableScroll(wrap,freezeN){
-  if(wrap._scrollBound)return;
-  wrap._scrollBound=true;
-  wrap.addEventListener('scroll',function(){
+// 统一滚动容器：监听 #planContent 的 scroll，用 transform 实现表头固定和列冻结
+let _planScrollBound=false;
+function bindPlanScroll(){
+  const pc=document.getElementById('planContent');
+  if(!pc||_planScrollBound)return;
+  _planScrollBound=true;
+  pc.addEventListener('scroll',function(){
     const st=this.scrollTop, sl=this.scrollLeft;
-    const table=this.querySelector('table');
-    if(!table)return;
-    // 表头固定：所有th translateY
-    const ths=table.querySelectorAll('thead th');
-    ths.forEach(th=>{
+    // 所有表格的表头固定
+    const allThs=this.querySelectorAll('thead th');
+    allThs.forEach(th=>{
       if(th.classList.contains('frozen-col')){
-        // 表头+冻结列：同时translateX和Y
-        const left=parseFloat(th.style.left)||0;
         th.style.transform='translate('+sl+'px,'+st+'px)';
-        th.style.left=left+'px';
       }else{
-        // 仅表头：translateY
         th.style.transform='translateY('+st+'px)';
       }
     });
-    // 冻结列：td.frozen-col translateX
-    if(freezeN>0){
-      const ftds=table.querySelectorAll('tbody td.frozen-col');
-      ftds.forEach(td=>{
-        td.style.transform='translateX('+sl+'px)';
-      });
-    }
+    // 所有表格的冻结列
+    const allFrozen=this.querySelectorAll('tbody td.frozen-col');
+    allFrozen.forEach(td=>{
+      td.style.transform='translateX('+sl+'px)';
+    });
   },{passive:true});
 }
 // 窗口大小变化时重新计算冻结列
