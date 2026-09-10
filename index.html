@@ -140,8 +140,8 @@ tr:hover{background:#f8fafc}
 #planContent{max-height:calc(100vh - 280px);overflow:auto;border:1px solid var(--border);border-radius:6px;position:relative;}
 .plan-table-wrap{position:relative;}
 .plan-table-wrap .tw{overflow:visible;}
-.plan-table-wrap thead th{will-change:transform;}
-.plan-table-wrap .frozen-col{will-change:transform;}
+.plan-table-wrap thead th{position:sticky;top:0;}
+.plan-table-wrap .frozen-col{position:sticky;}
 .plan-table-wrap table{border-collapse:separate;border-spacing:0;width:100%;table-layout:auto;}
 .plan-table-wrap th{z-index:5;background:#f8fafc;user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.08);}
 .plan-table-wrap th .col-resizer{position:absolute;right:0;top:0;width:6px;height:100%;cursor:col-resize;background:transparent;z-index:10;}
@@ -162,7 +162,7 @@ tr:hover{background:#f8fafc}
 /* ===== 冻结列 ===== */
 .plan-table-wrap .frozen-col{z-index:4;background:#ffffff;box-shadow:2px 0 4px rgba(0,0,0,0.06);}
 .plan-table-wrap tbody td.frozen-col{z-index:4;background:#ffffff;}
-.plan-table-wrap thead th.frozen-col{z-index:6;background:#f8fafc;box-shadow:2px 2px 4px rgba(0,0,0,0.1);}
+.plan-table-wrap thead th.frozen-col{position:sticky;top:0;z-index:6;background:#f8fafc;box-shadow:2px 2px 4px rgba(0,0,0,0.1);}
 /* ===== 可搜索下拉 ===== */
 .search-select{position:relative;display:inline-block;}
 .search-select input{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px;background:var(--bg);color:var(--text);cursor:pointer;}
@@ -2444,7 +2444,7 @@ renderPlanContent();
 initSearchableSelects();
 }
 function planResetFilter(){planF={prod:'',status:'',from:'',to:''};rp();}
-function sv(v){planView=v;rp();setTimeout(function(){const pc=document.getElementById('planContent');if(pc&&pc._scrollHandler){_planScrollHandler.call(pc);}},100);}
+function sv(v){planView=v;rp();}
 
 function exportPlanExcel(){
   try{
@@ -2753,16 +2753,14 @@ function applyFreezeCols(){
   wraps.forEach(wrap=>{
     const table=wrap.querySelector('table');
     if(!table)return;
-    // 清除旧的冻结样式和transform
+    // 清除旧的冻结样式
     table.querySelectorAll('.frozen-col').forEach(el=>{
       el.classList.remove('frozen-col');
       el.style.left='';
-      el.style.transform='';
     });
-    table.querySelectorAll('thead th').forEach(th=>{th.style.transform='';});
     const sel=document.getElementById('pfFreeze');
     const n=sel?parseInt(sel.value):(typeof freezeCols!=='undefined'?freezeCols:6);
-    if(n<=0){bindTableScroll(wrap,0);return;}
+    if(n<=0){return;}
     // 计算每列宽度（用thead的th）
     const firstRow=table.querySelector('thead tr');
     if(!firstRow)return;
@@ -2790,40 +2788,8 @@ function applyFreezeCols(){
       }
     });
   });
-  // 绑定统一滚动容器的滚动监听
-  bindPlanScroll();
 }
-// 统一滚动容器：监听 #planContent 的 scroll，用 transform 实现表头固定和列冻结
-function _planScrollHandler(){
-  const st=this.scrollTop, sl=this.scrollLeft;
-  // 所有表格的表头固定
-  const allThs=this.querySelectorAll('thead th');
-  allThs.forEach(th=>{
-    if(th.classList.contains('frozen-col')){
-      th.style.transform='translate('+sl+'px,'+st+'px)';
-    }else{
-      th.style.transform='translateY('+st+'px)';
-    }
-  });
-  // 所有表格的冻结列
-  const allFrozen=this.querySelectorAll('tbody td.frozen-col');
-  allFrozen.forEach(td=>{
-    td.style.transform='translateX('+sl+'px)';
-  });
-}
-function bindPlanScroll(){
-  const pc=document.getElementById('planContent');
-  if(!pc)return;
-  // 先移除旧的监听器（如果有），避免重复绑定
-  if(pc._scrollHandler){
-    pc.removeEventListener('scroll',pc._scrollHandler);
-  }
-  // 绑定新的监听器到当前 #planContent
-  pc._scrollHandler=_planScrollHandler;
-  pc.addEventListener('scroll',_planScrollHandler,{passive:true});
-  // 立即触发一次，确保初始状态正确
-  setTimeout(()=>{_planScrollHandler.call(pc);},10);
-}
+// CSS position:sticky 原生实现表头固定和列冻结，无需JS滚动监听
 // 窗口大小变化时重新计算冻结列
 window.addEventListener('resize',()=>{clearTimeout(window._freezeTimer);window._freezeTimer=setTimeout(applyFreezeCols,200);});
 
