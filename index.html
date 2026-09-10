@@ -72,7 +72,7 @@ body{font-family:'Noto Sans SC',-apple-system,sans-serif;background:var(--bg);co
 .btnd{background:var(--danger);color:#fff;border-color:var(--danger)}
 .btnsm{padding:4px 9px;font-size:11.5px}
 .btn svg{width:13px;height:13px}
-.tw{overflow-x:auto}
+.tw{overflow:visible}
 table{width:100%;border-collapse:collapse;font-size:12.5px}
 th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--border)}
 th{background:#f8fafc;font-weight:600;color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
@@ -137,11 +137,11 @@ tr:hover{background:#f8fafc}
 .readonly{background:var(--bg2);color:var(--text2);cursor:not-allowed}
 
 /* ===== 生产计划表格交互 ===== */
-#planContent{max-height:calc(100vh - 280px);overflow:auto;border:1px solid var(--border);border-radius:6px;position:relative;}
+#planContent{position:relative;}
 .plan-table-wrap{position:relative;}
 .plan-table-wrap .tw{overflow:visible;}
-.plan-table-wrap thead th{position:sticky;top:0;}
-.plan-table-wrap .frozen-col{position:sticky;}
+.plan-table-wrap thead th{position:sticky;top:56px;z-index:10;}
+.plan-table-wrap .frozen-col{position:sticky;z-index:9;}
 .plan-table-wrap table{border-collapse:separate;border-spacing:0;width:100%;table-layout:auto;}
 .plan-table-wrap th{z-index:5;background:#f8fafc;user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.08);}
 .plan-table-wrap th .col-resizer{position:absolute;right:0;top:0;width:6px;height:100%;cursor:col-resize;background:transparent;z-index:10;}
@@ -161,8 +161,8 @@ tr:hover{background:#f8fafc}
 
 /* ===== 冻结列 ===== */
 .plan-table-wrap .frozen-col{z-index:4;background:#ffffff;box-shadow:2px 0 4px rgba(0,0,0,0.06);}
-.plan-table-wrap tbody td.frozen-col{z-index:4;background:#ffffff;}
-.plan-table-wrap thead th.frozen-col{position:sticky;top:0;z-index:6;background:#f8fafc;box-shadow:2px 2px 4px rgba(0,0,0,0.1);}
+.plan-table-wrap tbody td.frozen-col{z-index:9;background:#ffffff;position:sticky;}
+.plan-table-wrap thead th.frozen-col{position:sticky;top:56px;z-index:11;background:#f8fafc;box-shadow:2px 2px 4px rgba(0,0,0,0.1);}
 /* ===== 可搜索下拉 ===== */
 .search-select{position:relative;display:inline-block;}
 .search-select input{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px;background:var(--bg);color:var(--text);cursor:pointer;}
