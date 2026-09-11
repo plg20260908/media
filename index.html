@@ -140,7 +140,7 @@ tr:hover{background:#f8fafc}
 #planContent{position:relative;}
 .plan-table-wrap{position:relative;}
 .plan-table-wrap .tw{overflow:visible;}
-.plan-table-wrap thead th{position:sticky;top:49px;z-index:20;}
+.plan-table-wrap thead th{position:relative;top:0;z-index:20;}
 .plan-table-wrap .frozen-col{position:sticky;z-index:9;}
 .plan-table-wrap table{border-collapse:separate;border-spacing:0;width:100%;table-layout:auto;}
 .plan-table-wrap th{z-index:5;background:#f8fafc;user-select:none;cursor:default;padding:8px 12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.08);}
@@ -159,9 +159,9 @@ tr:hover{background:#f8fafc}
 .plan-toolbar button:hover{background:var(--primary);color:#fff;border-color:var(--primary);}
 
 /* ===== 冻结列 ===== */
-.plan-table-wrap .frozen-col{z-index:4;background:#ffffff !important;box-shadow:2px 0 4px rgba(0,0,0,0.06);border-right:2px solid #e2e8f0;}
-.plan-table-wrap tbody td.frozen-col{z-index:9;background:#ffffff !important;position:sticky;}
-.plan-table-wrap thead th.frozen-col{position:sticky;top:49px;z-index:21;background:#f8fafc !important;box-shadow:2px 2px 4px rgba(0,0,0,0.1);border-right:2px solid #e2e8f0;}
+.plan-table-wrap .frozen-col{z-index:4;background:#ffffff !important;box-shadow:2px 0 4px rgba(0,0,0,0.06);border-right:2px solid #e2e8f0;position:relative;}
+.plan-table-wrap tbody td.frozen-col{z-index:9;background:#ffffff !important;position:relative;}
+.plan-table-wrap thead th.frozen-col{position:relative;top:0;z-index:21;background:#f8fafc !important;box-shadow:2px 2px 4px rgba(0,0,0,0.1);border-right:2px solid #e2e8f0;}
 /* ===== 可搜索下拉 ===== */
 .search-select{position:relative;display:inline-block;}
 .search-select input{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px;background:var(--bg);color:var(--text);cursor:pointer;}
@@ -2739,13 +2739,12 @@ function filterSSDropdown(wrap,sel,filter){
 }
 
 
-// ===== 应用冻结列 =====
+// ===== 应用冻结列（JS transform 动态偏移方案） =====
 function applyFreezeCols(){
   const wraps=document.querySelectorAll('.plan-table-wrap');
   wraps.forEach(wrap=>{
     const table=wrap.querySelector('table');
     if(!table)return;
-    // 先获取表头列
     const firstRow=table.querySelector('thead tr');
     if(!firstRow)return;
     const ths=firstRow.querySelectorAll('th');
@@ -2758,54 +2757,87 @@ function applyFreezeCols(){
       const sel=document.getElementById('pfFreeze');
       const n=sel?parseInt(sel.value):(typeof freezeCols!=='undefined'?freezeCols:6);
       if(n<=0){
-        // 清除旧的冻结样式
-        table.querySelectorAll('.frozen-col').forEach(el=>{el.classList.remove('frozen-col');el.style.left='';});
+        table.querySelectorAll('.frozen-col').forEach(el=>{el.classList.remove('frozen-col');el.style.transform='';el.style.left='';});
         return;
       }
       colIndexes=Array.from({length:Math.min(n,ths.length)},(_,i)=>i);
     }
     if(!colIndexes||colIndexes.length===0){
-      table.querySelectorAll('.frozen-col').forEach(el=>{el.classList.remove('frozen-col');el.style.left='';});
+      table.querySelectorAll('.frozen-col').forEach(el=>{el.classList.remove('frozen-col');el.style.transform='';el.style.left='';});
       return;
     }
     // 清除旧的冻结样式
-    table.querySelectorAll('.frozen-col').forEach(el=>{el.classList.remove('frozen-col');el.style.left='';});
+    table.querySelectorAll('.frozen-col').forEach(el=>{el.classList.remove('frozen-col');el.style.transform='';el.style.left='';});
     // 计算每列宽度
     const allWidths=[];
     for(let i=0;i<ths.length;i++){
       allWidths.push(ths[i].getBoundingClientRect().width||ths[i].offsetWidth||80);
     }
-    // 计算表格左侧到滚动容器(body)左侧的距离
+    // 计算表格左侧到视口左侧的距离
     const tableRect=table.getBoundingClientRect();
-    const tableLeft=tableRect.left+window.scrollX;
-    // 计算每列的left偏移（相对于body左侧）
-    const colLeft=[];
-    let acc=tableLeft;
-    for(let i=0;i<allWidths.length;i++){
-      colLeft.push(acc);
-      acc+=allWidths[i];
-    }
-    // 应用到thead
+    const tableLeft=tableRect.left;
+    // 存储冻结列信息到 table 上，供滚动监听使用
+    const tableTop=tableRect.top+window.scrollY;table._freezeInfo={colIndexes:colIndexes,tableLeft:tableLeft,tableTop:tableTop,allWidths:allWidths};
+    // 应用冻结类
     colIndexes.forEach(idx=>{
-      if(idx<ths.length){
-        ths[idx].classList.add('frozen-col');
-        ths[idx].style.left=colLeft[idx]+'px';
-      }
+      if(idx<ths.length)ths[idx].classList.add('frozen-col');
     });
-    // 应用到tbody每行
     const rows=table.querySelectorAll('tbody tr');
     rows.forEach(row=>{
       const tds=row.querySelectorAll('td');
       colIndexes.forEach(idx=>{
-        if(idx<tds.length){
-          tds[idx].classList.add('frozen-col');
-          tds[idx].style.left=colLeft[idx]+'px';
-        }
+        if(idx<tds.length)tds[idx].classList.add('frozen-col');
       });
+    });
+    // 立即应用一次偏移
+    updateFreezeTransform(table);
+  });
+}
+// 更新冻结列和表头的 transform 偏移
+function updateFreezeTransform(table){
+  const info=table._freezeInfo;
+  if(!info)return;
+  const scrollX=window.scrollX;
+  const scrollY=window.scrollY;
+  const {colIndexes,tableLeft,tableTop,allWidths}=info;
+  const topbarHeight=49;
+  // 计算表头垂直偏移：当表格顶部滚动到topbar上方时，表头固定在topbar下方
+  let headerY=0;
+  if(scrollY > tableTop - topbarHeight){
+    headerY = scrollY - tableTop + topbarHeight;
+  }
+  // 应用表头垂直偏移到所有 th
+  const allThs=table.querySelectorAll('thead th');
+  allThs.forEach((th,idx)=>{
+    if(colIndexes.includes(idx)){
+      // 冻结列的表头：同时水平和垂直偏移
+      th.style.transform='translate('+scrollX+'px,'+headerY+'px)';
+    }else{
+      // 非冻结列的表头：只垂直偏移
+      th.style.transform='translateY('+headerY+'px)';
+    }
+  });
+  // 应用水平偏移到 tbody 冻结列
+  const rows=table.querySelectorAll('tbody tr');
+  rows.forEach(row=>{
+    const tds=row.querySelectorAll('td');
+    colIndexes.forEach(idx=>{
+      if(idx<tds.length){
+        tds[idx].style.transform='translateX('+scrollX+'px)';
+      }
     });
   });
 }
-// CSS position:sticky 原生实现表头固定和列冻结，无需JS滚动监听
+// 全局滚动监听：水平滚动时更新所有冻结列的 transform
+let _freezeScrollTimer=null;
+window.addEventListener('scroll',()=>{
+  if(_freezeScrollTimer)clearTimeout(_freezeScrollTimer);
+  _freezeScrollTimer=setTimeout(()=>{
+    document.querySelectorAll('.plan-table-wrap table').forEach(table=>{
+      if(table._freezeInfo)updateFreezeTransform(table);
+    });
+  },10);
+},{passive:true});
 // 窗口大小变化时重新计算冻结列
 window.addEventListener('resize',()=>{clearTimeout(window._freezeTimer);window._freezeTimer=setTimeout(applyFreezeCols,200);});
 
