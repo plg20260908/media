@@ -3224,10 +3224,10 @@ const reader=new FileReader();
 reader.onload=function(e){
 try{
 const data=new Uint8Array(e.target.result);
-const wb=XLSX.read(data,{type:'array'});
+const wb=XLSX.read(data,{type:'array',dense:true});
 const pdSheet=wb.SheetNames.find(n=>String(n).includes('生产明细'));
 const ws=wb.Sheets[pdSheet||wb.SheetNames[0]];
-const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',range:{s:{r:0,c:0},e:{r:6000,c:30}}}); // 限制解析范围，避免超大sheet卡死
+const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
 let headerRow=0;
 for(let i=0;i<Math.min(5,json.length);i++){
 const nonEmpty=json[i].filter(c=>String(c).trim()).length;
@@ -3238,7 +3238,11 @@ const rows=json.slice(headerRow+1).filter(r=>r.some(c=>String(c).trim()));
 _importData={headers,rows,raw:json};
 _importType=type;
 showImportMapping(type);
-}catch(err){console.error('导入解析错误:',err);toast('文件解析失败：'+err.message+'（请确认是金蝶导出的标准xlsx文件）',true);}
+}catch(err){
+console.error('导入解析错误:',err);
+console.error('错误堆栈:',err.stack);
+toast('文件解析失败：'+err.message+'（请确认是金蝶导出的标准xlsx文件）',true);
+}
 };
 reader.readAsArrayBuffer(file);
 }
