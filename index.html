@@ -3220,18 +3220,89 @@ function sdel(i){if(!confirm('确定删除？'))return;D.stats.splice(i,1);saveD
 // ===== Excel导入通用逻辑 =====
 let _importData=null,_importType=null;
 function handleFile(file,type){
+const fileName=file.name.toLowerCase();
+const isCSV=fileName.endsWith('.csv');
+
+// CSV解析函数
+function parseCSV(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  return lines.map(line=>{
+    const result=[];let cur='';let inQuotes=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){if(inQuotes&&line[i+1]==='"'){cur+='"';i++;}else inQuotes=!inQuotes;}
+      else if(ch===','&&!inQuotes){result.push(cur);cur='';}
+      else cur+=ch;
+    }
+    result.push(cur);return result;
+  });
+}
+
+if(isCSV){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const text=e.target.result;
+      const json=parseCSV(text);
+      let headerRow=0;
+      for(let i=0;i<Math.min(5,json.length);i++){
+        const nonEmpty=json[i].filter(c=>String(c).trim()).length;
+        if(nonEmpty>=3){headerRow=i;break;}
+      }
+      const headers=json[headerRow].map(h=>String(h).trim());
+      const rows=json.slice(headerRow+1).filter(r=>r.some(c=>String(c).trim()));
+      _importData={headers,rows,raw:json};
+      _importType=type;
+      showImportMapping(type);
+    }catch(err){
+      toast('CSV解析失败：'+err.message,true);
+    }
+  };
+  reader.readAsText(file,'UTF-8');
+  return;
+}
+
+// XLSX解析（多重容错）
 const reader=new FileReader();
 reader.onload=function(e){
+let wb=null;
+let parseErr=null;
+const tryParse=(data,parseType,opts)=>{
 try{
-const data=new Uint8Array(e.target.result);
-const wb=XLSX.read(data,{type:'array',dense:true});
+  const options=opts||{};
+  options.type=parseType;
+  wb=XLSX.read(data,options);
+  return true;
+}catch(err){
+  parseErr=err;
+  console.warn('解析方式'+parseType+'失败:',err.message||err);
+  return false;
+}
+};
+try{
+const arrayData=new Uint8Array(e.target.result);
+// 方式1: array（最常用）
+if(!tryParse(arrayData,'array')){
+  // 方式2: binary字符串
+  let binary='';
+  const bytes=new Uint8Array(e.target.result);
+  for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+  if(!tryParse(binary,'binary')){
+    // 方式3: base64
+    let base64='';
+    try{base64=btoa(binary);}catch(e){}
+    if(base64)tryParse(base64,'base64');
+  }
+}
+if(!wb){throw parseErr||new Error('所有解析方式均失败');}
 const pdSheet=wb.SheetNames.find(n=>String(n).includes('生产明细'));
 const ws=wb.Sheets[pdSheet||wb.SheetNames[0]];
+if(!ws){throw new Error('未找到工作表');}
 const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
 let headerRow=0;
 for(let i=0;i<Math.min(5,json.length);i++){
-const nonEmpty=json[i].filter(c=>String(c).trim()).length;
-if(nonEmpty>=3){headerRow=i;break;}
+  const nonEmpty=json[i].filter(c=>String(c).trim()).length;
+  if(nonEmpty>=3){headerRow=i;break;}
 }
 const headers=json[headerRow].map(h=>String(h).trim());
 const rows=json.slice(headerRow+1).filter(r=>r.some(c=>String(c).trim()));
@@ -3240,12 +3311,13 @@ _importType=type;
 showImportMapping(type);
 }catch(err){
 console.error('导入解析错误:',err);
-console.error('错误堆栈:',err.stack);
-toast('文件解析失败：'+err.message+'（请确认是金蝶导出的标准xlsx文件）',true);
+const errMsg=err&&err.message?err.message:(typeof err==='string'?err:'未知错误');
+toast('文件解析失败：'+errMsg+'\n建议：1.用Excel打开后另存为CSV格式再导入；2.或使用Chrome浏览器打开本页面',true);
 }
 };
 reader.readAsArrayBuffer(file);
 }
+
 function showImportMapping(type){
 const {headers,rows}=_importData;
 const configs={
