@@ -3238,7 +3238,7 @@ const rows=json.slice(headerRow+1).filter(r=>r.some(c=>String(c).trim()));
 _importData={headers,rows,raw:json};
 _importType=type;
 showImportMapping(type);
-}catch(err){toast('文件解析失败：'+err.message,true);}
+}catch(err){console.error('导入解析错误:',err);toast('文件解析失败：'+err.message+'（请确认是金蝶导出的标准xlsx文件）',true);}
 };
 reader.readAsArrayBuffer(file);
 }
@@ -3247,8 +3247,8 @@ const {headers,rows}=_importData;
 const configs={
 mat:{title:'金蝶库存Excel导入',fields:[
 {k:'code',l:'物料编码'},{k:'name',l:'物料名称'},{k:'spec',l:'规格型号'},
-{k:'cat',l:'物料类别'},{k:'stock',l:'库存数量'},{k:'safetyStock',l:'安全库存'},
-{k:'unit',l:'单位'},{k:'supplier',l:'供应商'}
+{k:'warehouse',l:'仓库名称'},{k:'batch',l:'批号'},{k:'expiry',l:'有效期至'},
+{k:'unit',l:'库存主单位'},{k:'stock',l:'库存量'}
 ],keyField:'code'},
 bom:{title:'BOM物料清单导入',fields:[
 {k:'productName',l:'产品名称'},{k:'spec',l:'产品规格'},{k:'itemNo',l:'货号'},
@@ -3280,14 +3280,14 @@ if(hcol.includes(f.l)||f.l.includes(hcol)||hcol.includes(f.k))guess=f.k;
 });
 }
 if(!guess&&type==='mat'){
-if(hcol.includes('类别')||hcol.includes('分类')||hcol.includes('类目')||hcol.includes('物料组'))guess='cat';
-else if(hcol.includes('物料编码')||hcol.includes('物料代码')||hcol.includes('编码')||hcol.includes('代码')||hcol.includes('编号'))guess='code';
-else if(hcol.includes('物料名称')||hcol.includes('品名')||(hcol.includes('名称')&&!hcol.includes('仓库')&&!hcol.includes('库位')&&!hcol.includes('仓位')))guess='name';
-else if(hcol.includes('规格')||hcol.includes('型号')||hcol.includes('材质'))guess='spec';
-else if(hcol.includes('安全')||hcol.includes('最低')||hcol.includes('下限')||hcol.includes('警戒'))guess='safetyStock';
-else if(hcol.includes('库存主单位')||hcol.includes('计量单位')||hcol.includes('基本单位')||(hcol.includes('单位')&&!hcol.includes('库存量')&&!hcol.includes('数量')))guess='unit';
-else if(hcol.includes('库存')||hcol.includes('数量')||hcol.includes('结存')||hcol.includes('存量')||hcol.includes('现存量')||hcol.includes('可用量'))guess='stock';
-else if(hcol.includes('供应商')||hcol.includes('厂家')||hcol.includes('供方'))guess='supplier';
+if(hcol==='物料编码'||hcol.includes('物料编码')||hcol.includes('物料代码')||hcol==='编码'||hcol.includes('代码')||hcol.includes('编号'))guess='code';
+else if(hcol==='物料名称'||hcol.includes('物料名称')||hcol.includes('品名')||(hcol.includes('名称')&&!hcol.includes('仓库')&&!hcol.includes('库位')&&!hcol.includes('仓位')))guess='name';
+else if(hcol==='规格型号'||hcol.includes('规格')||hcol.includes('型号')||hcol.includes('材质'))guess='spec';
+else if(hcol==='仓库名称'||hcol.includes('仓库')||hcol.includes('库位')||hcol.includes('仓位'))guess='warehouse';
+else if(hcol==='批号'||hcol.includes('批号')||hcol.includes('批次'))guess='batch';
+else if(hcol==='有效期至'||hcol.includes('有效期')||hcol.includes('失效期')||hcol.includes('到期日')||hcol.includes('效期'))guess='expiry';
+else if(hcol==='库存主单位'||hcol.includes('库存主单位')||hcol.includes('计量单位')||hcol.includes('基本单位')||(hcol==='单位'&&!hcol.includes('库存量')&&!hcol.includes('数量')))guess='unit';
+else if(hcol==='库存量(主单位)'||hcol==='库存量'||hcol.includes('库存量')||hcol.includes('库存数量')||hcol.includes('结存')||hcol.includes('存量')||hcol.includes('现存量')||hcol.includes('可用量'))guess='stock';
 }else if(!guess&&type==='bom'){
 if(hcol.includes('产品'))guess='productName';
 else if(hcol.includes('物料'))guess='materialName';
@@ -3333,7 +3333,7 @@ document.querySelectorAll('[id^="map_"]').forEach(sel=>{
 if(sel.value)mappings[sel.dataset.col]=sel.value;
 });
 if(Object.keys(mappings).length===0){toast('请至少映射一列',true);return;}
-if(type==='mat'){const need=['code','name','cat','stock'];const miss=need.filter(k=>!Object.values(mappings).includes(k)).map(k=>({code:'物料编码',name:'物料名称',cat:'物料类别',stock:'库存数量'}[k]));if(miss.length&&!confirm('以下关键字段未映射，可能导致数据不完整：\n'+miss.join('、')+'\n\n仍要继续导入吗？'))return;}
+if(type==='mat'){const need=['code','name','stock'];const miss=need.filter(k=>!Object.values(mappings).includes(k)).map(k=>({code:'物料编码',name:'物料名称',stock:'库存量'}[k]));if(miss.length&&!confirm('以下关键字段未映射，可能导致数据不完整：\n'+miss.join('、')+'\n\n仍要继续导入吗？'))return;}
 const mode=document.querySelector('input[name="importMode"]:checked').value;
 const imported=[];
 rows.forEach(row=>{
