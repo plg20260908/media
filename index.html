@@ -2192,7 +2192,7 @@ const items=[];const noBom=[];const agg={};
 Object.entries(pa).forEach(([k,a])=>{
 const [pn,spec]=k.split('|');
 let boms=D.boms.filter(b=>b.productName===pn);
-if(spec){const fs=boms.filter(b=>normSpec(b.spec)===normSpec(spec));if(fs.length>0)boms=fs;}
+if(spec){const fs=boms.filter(b=>specMatch(b.spec,spec));if(fs.length>0)boms=fs;}
 if(boms.length===0){noBom.push(pn+(spec?'('+spec+')':''));return;}
 const pProxy={productName:pn,spec:spec||'',planQty:a.qty,unit:a.unit,prepVol:a.prep};
 boms.forEach(b=>{
@@ -2200,17 +2200,22 @@ const {raw,unit}=calcReq(b,pProxy);
 if(!(raw>0))return;
 const nm=b.materialName||'';
 const m=findMatByBom(b,pProxy);
-let idx=agg[nm];
-if(idx===undefined){idx=items.length;agg[nm]=idx;items.push({code:m?m.code:'—',name:nm,spec:b.buySpec||(m?m.spec:'')||b.spec||'—',req:0,reqRaw:0,reqUnit:unit,stock:m?((m.stock??m.stockQty)||0):0,safety:m?((m.safetyStock??m.safety)||0):'—',buy:m?0:'—',unit:unit,supplier:m?m.supplier:'—',isShort:false,linked:!!m});}
-const it=items[idx];it.reqRaw+=raw;it.reqUnit=unit;
+const packSpec=b.buySpec||(m?m.spec:'')||b.spec||'—';
+const packKey=b.buySpec||(m?m.spec:'')||b.spec||'';
+const aggKey=nm+'|'+packKey+'|'+(b.prodUnit||'');
+let idx=agg[aggKey];
+if(idx===undefined){idx=items.length;agg[aggKey]=idx;items.push({_m:m||null,code:m?m.code:'—',name:nm,spec:packSpec,req:0,reqRaw:0,reqUnit:unit,stock:m?matStock(m):0,safety:m?((m.safetyStock??m.safety)||0):'—',buy:m?0:'—',unit:unit,supplier:m?m.supplier:'—',isShort:false,linked:!!m});}
+const it=items[idx];
+if(m&&!it.linked){it._m=m;it.code=m.code;it.spec=packSpec;it.stock=matStock(m);it.safety=(m.safetyStock??m.safety)??it.safety;it.supplier=m.supplier??it.supplier;it.linked=true;}
+it.reqRaw+=raw;it.reqUnit=unit;
 });
 });
 items.forEach(it=>{
-const m=D.mats.find(x=>x.code===it.code)||null;
+const m=it._m||null;
 const packSpec=it.spec,pk=parsePack(packSpec);
-let raw=it.reqRaw,unit=it.reqUnit,stock=it.stock;
+let raw=it.reqRaw,unit=it.reqUnit,stock=it.linked?matStock(m):0;
 let short=raw-stock,reqDisp=raw;
-if(pk&&raw>0){const[reqB]=unitBase(unit);if(reqB===pk.base){const reqPacks=raw/pk.amt;let stockPacks=stock;const pkM=parsePack(m?m.spec:'');if(m&&pkM&&pkM.base===pk.base)stockPacks=(stock*pkM.amt)/pk.amt;short=reqPacks-stockPacks;reqDisp=reqPacks;it.unit=(m&&m.unit)?m.unit:(packUnitName(packSpec)||it.unit);}}
+if(pk&&raw>0){const[reqB]=unitBase(unit);if(reqB===pk.base){const reqPacks=raw/pk.amt;let stockPacks=stock;if(m){const mu=String(m.unit||'').trim();const[mBase,mMul]=unitBase(mu);if(mBase===pk.base){stockPacks=(stock*(mMul||1))/pk.amt;}else{const pkCount=packUnitName(packSpec)||'';const muNorm=mu.replace(/[0-9×x*\- ]/g,'');if(!(muNorm&&pkCount&&muNorm===pkCount))stockPacks=stock;}}short=reqPacks-stockPacks;reqDisp=reqPacks;it.unit=(packUnitName(packSpec)||(m&&m.unit)||it.unit);stock=stockPacks;}}
 it.req=reqDisp>0?parseFloat(reqDisp.toFixed(2)):0;
 it.short=short>0?parseFloat(short.toFixed(2)):0;
 it.isShort=it.linked?short>0:false;
@@ -2223,6 +2228,25 @@ rsr();toast('时间段缺料计算完成：'+plans.length+'个计划 / '+Object.
 
 // ---- BOM/库存匹配与缺料计算辅助 ----
 function normMatName(s){return String(s||'').replace(/[（(][^）)]*[)）]/g,'').replace(/无菌|脱纤维|干粉|基础/g,'').replace(/[·\s]+/g,'');}
+// 规格模糊匹配：优先精确，其次按直径(90mm/70mm)、再按包装规格数字匹配，避免90mm与70mm BOM混算
+function specMatch(bSpec,pSpec){
+  if(!pSpec)return true;
+  if(normSpec(bSpec)===normSpec(pSpec))return true;
+  const d=String(pSpec).match(/(\d{2,3})\s*mm/);
+  if(d){const bd=String(bSpec||'').match(/(\d{2,3})\s*mm/);return bd&&bd[1]===d[1];}
+  const n=String(pSpec).match(/(\d+)\s*(块|管|瓶|袋|支|盒|包|张)/);
+  if(n){const bn=String(bSpec||'').match(/(\d+)\s*(块|管|瓶|袋|支|盒|包|张)/);return bn&&bn[1]===n[1]&&bn[2]===n[2];}
+  return false;
+}
+// 库存聚合：同一物料（按物料编码/名称+规格）跨仓库、跨批次的所有库存记录求和
+function matStock(m){
+  if(!m)return 0;
+  const v=x=>parseFloat(x?.stock??x?.stockQty)||0;
+  if(m.code&&m.code!=='—'&&m.code!==undefined){let s=0;D.mats.forEach(x=>{if(x.code===m.code)s+=v(x);});return s;}
+  const key=(String(m.name||'')+'|'+String(m.spec||''));
+  let s=0;D.mats.forEach(x=>{if((String(x.name||'')+'|'+String(x.spec||''))===key)s+=v(x);});
+  return s;
+}
 function unitBase(u){u=String(u||'').toLowerCase();if(u==='kg'||u==='t')return['g',u==='kg'?1000:1e6];if(u==='g')return['g',1];if(u==='l'||u==='升')return['ml',1000];if(u==='ml'||u==='毫升')return['ml',1];return[u,1];}
 function parsePack(sp){const m=String(sp||'').match(/(\d+(?:\.\d+)?)\s*(g|kg|ml|l|个|块|卷|张|盒|袋|瓶|支|包)/i);if(!m)return null;const v=parseFloat(m[1]),u=m[2].toLowerCase();if(u==='kg')return{amt:v*1000,base:'g'};if(u==='l')return{amt:v*1000,base:'ml'};if(u==='ml')return{amt:v,base:'ml'};if(u==='g')return{amt:v,base:'g'};return{amt:v,base:u};}
 function packUnitName(sp){const m=String(sp||'').match(/\/([^\/\s,，]+)\s*$/);return m?m[1].replace(/[0-9×x*\-]/g,''):'';}
@@ -2274,25 +2298,30 @@ const res=[];
 boms.forEach(b=>{
   const m=findMatByBom(b,p);
   const {raw,unit}=calcReq(b,p);
-  const stock=m?((m.stock??m.stockQty)||0):0;
+  const stock=matStock(m);
   const safety=m?((m.safetyStock??m.safety)||0):'—';
-  const packSpec=b.buySpec||(m?m.spec:'');
+  const packSpec=b.buySpec||(m?m.spec:'')||b.spec||'—';
   let pk=parsePack(packSpec);
   if(!pk&&m)pk=parsePack(m.spec);
-  let reqDisp=raw,reqUnit=unit||'—',short=raw-stock;
+  let reqDisp=raw,reqUnit=unit||'—',short=raw-stock,dispStock=stock;
   if(pk&&raw>0){
     const[reqB]=unitBase(unit);
     if(reqB===pk.base){
       const reqPacks=raw/pk.amt;
       let stockPacks=stock;
-      const pkM=parsePack(m?m.spec:'');
-      if(m&&pkM&&pkM.base===pk.base)stockPacks=(stock*pkM.amt)/pk.amt;
+      if(m){
+        const mu=String(m.unit||'').trim();
+        const[mBase,mMul]=unitBase(mu);
+        if(mBase===pk.base){stockPacks=(stock*(mMul||1))/pk.amt;}
+        else{const pkCount=packUnitName(packSpec)||'';const muNorm=mu.replace(/[0-9×x*\- ]/g,'');if(!(muNorm&&pkCount&&muNorm===pkCount))stockPacks=stock;}
+      }
       short=reqPacks-stockPacks;
-      reqDisp=reqPacks;reqUnit=(m&&m.unit)?m.unit:(packUnitName(packSpec)||reqUnit);
+      reqDisp=reqPacks;reqUnit=(packUnitName(packSpec)||(m&&m.unit)||reqUnit);
+      dispStock=stockPacks;
     }
   }
   const buy=short>0?Math.ceil(short*1.05):0;
-  res.push({code:m?m.code:'—',name:b.materialName,spec:b.buySpec||(m?m.spec:'')||b.spec||'—',req:reqDisp>0?parseFloat(reqDisp.toFixed(2)):0,reqRaw:raw>0?raw.toFixed(2):'0',reqUnit,stock:m?stock:'—',safety,short:short>0?parseFloat(short.toFixed(2)):0,buy:m?buy:'—',unit:reqUnit,supplier:m?m.supplier:'—',isShort:m?short>0:false,linked:!!m});
+  res.push({code:m?m.code:'—',name:b.materialName,spec:packSpec,req:reqDisp>0?parseFloat(reqDisp.toFixed(2)):0,reqRaw:raw>0?raw.toFixed(2):'0',reqUnit,stock:m?dispStock:'—',safety,short:short>0?parseFloat(short.toFixed(2)):0,buy:m?buy:'—',unit:reqUnit,supplier:m?m.supplier:'—',isShort:m?short>0:false,linked:!!m});
 });
 _sres={p,items:res};rsr();toast('缺料计算完成');
 }
