@@ -3191,7 +3191,7 @@ function statResetFilter(){statF={prod:'',cat:'',from:'',to:''};rp();}
 function renderStatTable(){
 const box=$('statTable');if(!box)return;
 if($('sfProd')){statF.prod=$('sfProd').value;statF.cat=$('sfCat').value;statF.from=$('sfFrom').value;statF.to=$('sfTo').value;}
-let list=D.stats.slice().sort((a,b)=>String(b.batchNo||'').localeCompare(String(a.batchNo||'')));
+let list=D.stats.slice().sort((a,b)=>String(b.prodDate||'').localeCompare(String(a.prodDate||''))||String(a.productName||'').localeCompare(String(b.productName||''))||String(b.batchNo||'').localeCompare(String(a.batchNo||'')));
 if(statF.prod)list=list.filter(s=>s.productName===statF.prod);
 if(statF.cat)list=list.filter(s=>s.category===statF.cat);
 if(statF.from)list=list.filter(s=>s.prodDate>=statF.from);
@@ -3201,20 +3201,20 @@ const _sumBatch=list.length;
 const _sumPlan=list.reduce((s,x)=>s+(parseFloat(x.planQty)||0),0);
 const _sumActual=list.reduce((s,x)=>s+(parseFloat(x.actualQty)||0),0);
 const _sumHtml=(statF.prod||statF.cat||statF.from||statF.to)?('<div class="stat-summary"><div class="ss-item"><span class="ss-label">筛选结果：</span><span class="ss-value">'+_sumBatch+' 批次</span></div><div class="ss-item"><span class="ss-label">计划产量合计：</span><span class="ss-value">'+_sumPlan.toLocaleString()+'</span></div><div class="ss-item"><span class="ss-label">实际产量合计：</span><span class="ss-value">'+_sumActual.toLocaleString()+'</span></div>'+(statF.prod?'<div class="ss-item"><span class="ss-label">产品：</span><span class="ss-value">'+statF.prod+'</span></div>':'')+'</div>'):'';
-box.innerHTML=_sumHtml+'<div class="tw"><table><thead><tr><th>批号</th><th>产品名称</th><th>类别</th><th>生产日期</th><th>计划产量</th><th>实际产量</th><th>合格率(%)</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
-(list.length===0?'<tr><td colspan="9"><div class="empty">没有符合筛选条件的统计数据</div></td></tr>':
-list.map(s=>{const idx=D.stats.indexOf(s);return '<tr><td>'+s.batchNo+'</td><td>'+s.productName+'</td><td>'+ct(s.category)+'</td><td>'+s.prodDate+'</td><td>'+s.planQty+'</td><td>'+s.actualQty+'</td><td style="color:'+(s.passRate>=99?'var(--success)':s.passRate>=95?'var(--warning)':'var(--danger)')+'">'+s.passRate+'%</td><td>'+st(s.status)+'</td><td><a class="al" onclick="sf('+idx+')">编辑</a><a class="al d" onclick="sdel('+idx+')">删除</a></td></tr>';}).join(''))+
+box.innerHTML=_sumHtml+'<div class="tw"><table><thead><tr><th>生产日期</th><th>产品名称</th><th>类别</th><th>计划产量</th><th>实际产量</th><th>合格率(%)</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
+(list.length===0?'<tr><td colspan="8"><div class="empty">没有符合筛选条件的统计数据</div></td></tr>':
+list.map(s=>{const idx=D.stats.indexOf(s);return '<tr><td><strong>'+s.prodDate+'</strong></td><td>'+s.productName+'</td><td>'+ct(s.category)+'</td><td>'+s.planQty+'</td><td>'+s.actualQty+'</td><td style="color:'+(s.passRate>=99?'var(--success)':s.passRate>=95?'var(--warning)':'var(--danger)')+'">'+s.passRate+'%</td><td>'+st(s.status)+'</td><td><a class="al" onclick="sf('+idx+')">编辑</a><a class="al d" onclick="sdel('+idx+')">删除</a></td></tr>';}).join(''))+
 '</tbody></table></div>';
 }
 function alignStats(){
 try{
 const completed=D.plans.filter(p=>p.finishedQty>0||parseFloat(p.bzDone)>0);
-const bk={};completed.forEach(p=>{bk[p.prodDate.replace(/-/g,'').slice(2)+String(p.seq||'01').padStart(2,'0')]=true;});
+const bk={};completed.forEach(p=>{bk[p.prodDate.replace(/-/g,'').slice(2)+String(p.seq||'01').padStart(2,'0')+'|'+(p.productName||'')]=true;});
 const sopOf=n=>{const x=D.sops.find(s=>s.productName===n);return x?x.category:'一类产品';};
 let added=0,updated=0;
 completed.forEach(p=>{
 const batchNo=p.prodDate.replace(/-/g,'').slice(2)+String(p.seq||'01').padStart(2,'0');
-const exist=D.stats.find(s=>s.batchNo===batchNo);
+const exist=D.stats.find(s=>s.batchNo===batchNo&&s.productName===p.productName);
 const _finished=(parseFloat(p.ztQual)||0)+(parseFloat(p.ztDef)||0);const _bzDef=Math.max(0,(parseFloat(p.ztQual)||0)-(parseFloat(p.bzDone)||0));const _defQty=(parseFloat(p.ztDef)||0)+_bzDef;const _defRate=_finished>0?(_defQty/_finished*100):0;const passRate=_finished>0?Math.round((100-_defRate)*100)/100:0;
 if(exist){
 if(exist.planQty!==p.planQty||String(exist.actualQty)!==String(parseFloat(p.bzDone)||0))updated++;
@@ -3225,7 +3225,7 @@ D.stats.push({id:D.stats.reduce((m,r)=>Math.max(m,r.id||0),0)+1,batchNo,productN
 }
 });
 const before=D.stats.length;
-D.stats=D.stats.filter(s=>bk[s.batchNo]);
+D.stats=D.stats.filter(s=>bk[s.batchNo+'|'+(s.productName||'')]);
 const removed=before-D.stats.length;
 if(added||updated||removed)saveData(D);
 return {added,updated,removed};
@@ -3240,7 +3240,7 @@ saveData(D);rp();if(!silent)toast('同步完成：新增'+r.added+'条，更新'
 function sf(i){
 const edit=i!==null;const row=edit?D.stats[i]:{};
 let h='<div class="frow">';
-h+='<div class="fg"><label>批号</label><input type="text" dk="batchNo" value="'+(row.batchNo||'')+'"></div>';
+
 h+='<div class="fg"><label>产品名称</label><input type="text" dk="productName" value="'+(row.productName||'')+'"></div>';
 h+='<div class="fg"><label>产品类别</label><select dk="category"><option value="一类产品"'+(row.category==='一类产品'?' selected':'')+'>一类产品</option><option value="二类产品"'+(row.category==='二类产品'?' selected':'')+'>二类产品</option><option value="科研试剂"'+(row.category==='科研试剂'?' selected':'')+'>科研试剂</option></select></div>';
 h+='<div class="fg"><label>生产日期</label><input type="date" dk="prodDate" value="'+(row.prodDate||'')+'"></div>';
@@ -3254,6 +3254,7 @@ om((edit?'编辑':'新增')+'生产统计',h,'<button class="btn" onclick="cm()"
 function ssave(i){
 const ins=$('mbody').querySelectorAll('[dk]');const item={};
 ins.forEach(inp=>{let v=inp.value;if(inp.type==='number')v=parseFloat(v)||0;item[inp.getAttribute('dk')]=v});
+if(item.prodDate){const old=(i!==null&&D.stats[i])?D.stats[i]:null;item.batchNo=item.prodDate.replace(/-/g,'').slice(2)+(old&&old.batchNo?String(old.batchNo).slice(-2):'01');}
 if(i!==null)D.stats[i]={...D.stats[i],...item};
 else{item.id=D.stats.reduce((m,r)=>Math.max(m,r.id||0),0)+1;D.stats.push(item)}
 saveData(D);cm();rp();toast(i!==null?'修改成功':'新增成功');
