@@ -2885,19 +2885,30 @@ window.addEventListener('scroll',()=>{
 // 窗口大小变化时重新计算冻结列
 window.addEventListener('resize',()=>{clearTimeout(window._freezeTimer);window._freezeTimer=setTimeout(applyFreezeCols,200);});
 
-function productOptions(){return [...new Set(D.sops.map(s=>s.productName).concat(D.plans.map(p=>p.productName),(D.extraProds||[])))].filter(Boolean).sort();}
+function productOptions(){
+const bomProds=[...new Set((D.boms||[]).map(b=>b.productName))].filter(Boolean);
+const bomSet=new Set(bomProds);
+const norm=s=>s.replace(/[（(]/g,'(').replace(/[）)]/g,')').replace(/\s+/g,'');const sim=n=>bomProds.some(b=>{if(b===n)return false;const bn=norm(b),nn=norm(n);return bn===nn||bn.includes(nn)||nn.includes(bn);});
+const others=[...new Set(D.sops.map(s=>s.productName).concat(D.plans.map(p=>p.productName)))].filter(n=>n&&!bomSet.has(n)&&!sim(n));
+return [...new Set(bomProds.concat(others,(D.extraProds||[])))].filter(Boolean).sort();
+}
 let SPEC_EXTRA=[];
-function specOptions(prod){const extra=["3.5mL/管，10管/包","3.5mL/管，20管/包","3.5mL/管，20管/袋","55mm*10块/包","5mL/瓶，20瓶/盒","70mm*10块/包","90mm*10块/包","酚醇类，9mL，20瓶/盒","复合类，9mL，20瓶/盒","季铵盐类，9mL，20瓶/盒","脑心浸液肉汤，5mL/瓶，20瓶/盒","拭子型，3.5mL/管，20管/袋","树脂需氧瓶(成人)，25瓶/盒","树脂需氧瓶(成人)，50瓶/盒","树脂需氧瓶(儿童)，25瓶/盒","树脂需氧瓶(儿童)，50瓶/盒","树脂厌氧瓶，25瓶/盒","树脂厌氧瓶，50瓶/盒","氧化制剂类，9mL，20瓶/盒","液体，2mL/杯，50杯/盒","液体，2mL/管，50管/盒","营养肉汤，5mL/瓶，20瓶/盒"];const specs=[...new Set(D.plans.filter(p=>!prod||p.productName===prod).map(p=>p.spec))].filter(Boolean);return specs.length?[...new Set(specs.concat(extra,SPEC_EXTRA,D.extraSpecs||[]))]:[...new Set(extra.concat(SPEC_EXTRA,D.extraSpecs||[]))];}
+function specOptions(prod){const extra=["3.5mL/管，10管/包","3.5mL/管，20管/包","3.5mL/管，20管/袋","55mm*10块/包","5mL/瓶，20瓶/盒","70mm*10块/包","90mm*10块/包","酚醇类，9mL，20瓶/盒","复合类，9mL，20瓶/盒","季铵盐类，9mL，20瓶/盒","脑心浸液肉汤，5mL/瓶，20瓶/盒","拭子型，3.5mL/管，20管/袋","树脂需氧瓶(成人)，25瓶/盒","树脂需氧瓶(成人)，50瓶/盒","树脂需氧瓶(儿童)，25瓶/盒","树脂需氧瓶(儿童)，50瓶/盒","树脂厌氧瓶，25瓶/盒","树脂厌氧瓶，50瓶/盒","氧化制剂类，9mL，20瓶/盒","液体，2mL/杯，50杯/盒","液体，2mL/管，50管/盒","营养肉汤，5mL/瓶，20瓶/盒"];const bomSpecs=[...new Set((D.boms||[]).filter(b=>!prod||b.productName===prod).map(b=>b.spec))].filter(Boolean);const norm=s=>s.replace(/[（(]/g,'(').replace(/[）)]/g,')').replace(/\s+/g,'');const sim=s=>bomSpecs.some(bs=>{if(bs===s)return false;const bn=norm(bs),sn=norm(s);return bn===sn||bn.includes(sn)||sn.includes(bn);});const hist=[...new Set(D.plans.filter(p=>!prod||p.productName===prod).map(p=>p.spec))].filter(Boolean);if(bomSpecs.length>0){const histOk=hist.filter(s=>!bomSpecs.includes(s)&&!sim(s));return [...new Set(bomSpecs.concat(histOk,SPEC_EXTRA,D.extraSpecs||[]))];}const specs=hist;return specs.length?[...new Set(specs.concat(extra,SPEC_EXTRA,D.extraSpecs||[]))]:[...new Set(extra.concat(SPEC_EXTRA,D.extraSpecs||[]))];}
 function unitOptions(){return [...new Set(['块','瓶','管','人份','kg','L','mL','个','包','盒'].concat(D.extraUnits||[]))];}
 function pf(i){
 const edit=i!==null;const row=edit?D.plans[i]:{};
 const prods=productOptions();
+if(edit&&row.productName&&!prods.includes(row.productName))prods.push(row.productName);
 let h='<div class="frow">';
 h+='<div class="fg"><label>周次（按订单日期自动生成）</label><input type="text" dk="week" id="fweek" value="'+(weekOf(row.orderDate)||(wr(new Date()).start+'~'+wr(new Date()).end))+'" class="readonly" readonly></div>';
 h+='<div class="fg"><label>订单下达日期（决定周次）</label><input type="date" dk="orderDate" id="fordate" value="'+(row.orderDate||fd(new Date()))+'" onchange="autoWeek()"></div>';
 h+='<div class="fg ffull"><label>产品名称（下拉选择，可新增/删除）</label><select dk="productName" id="fprod" data-cur="'+(row.productName||'')+'" onchange="onProdSel(this)">'+prods.map(p=>'<option value="'+p+'"'+(p===row.productName?' selected':'')+'>'+p+'</option>').join('')+'<option value="__prod_new__">＋ 编辑/新增产品…</option><option value="__prod_del__">－ 删除产品…</option></select></div>';
-h+='<div class="fg"><label>规格（下拉选择，可新增/删除）</label><select dk="spec" id="fspec" data-cur="'+(row.spec||'')+'" onchange="onSpecSel(this)">'+specOptions(row.productName).map(s=>'<option value="'+s+'"'+(s===row.spec?' selected':'')+'>'+s+'</option>').join('')+'<option value="__spec_new__">＋ 编辑/新增规格…</option><option value="__spec_del__">－ 删除规格…</option></select></div>';
-h+='<div class="fg"><label>单位（下拉选择，可新增/删除）</label><select dk="unit" id="funit" data-cur="'+(row.unit||'')+'" onchange="onUnitSel(this)">'+unitOptions().map(u=>'<option value="'+u+'"'+(u===row.unit?' selected':'')+'>'+u+'</option>').join('')+'<option value="__unit_new__">＋ 编辑/新增单位…</option><option value="__unit_del__">－ 删除单位…</option></select></div>';
+const _specs=specOptions(row.productName);
+if(edit&&row.spec&&!_specs.includes(row.spec))_specs.push(row.spec);
+h+='<div class="fg"><label>规格（下拉选择，可新增/删除）</label><select dk="spec" id="fspec" data-cur="'+(row.spec||'')+'" onchange="onSpecSel(this)">'+_specs.map(s=>'<option value="'+s+'"'+(s===row.spec?' selected':'')+'>'+s+'</option>').join('')+'<option value="__spec_new__">＋ 编辑/新增规格…</option><option value="__spec_del__">－ 删除规格…</option></select></div>';
+const _units=unitOptions();
+if(edit&&row.unit&&!_units.includes(row.unit))_units.push(row.unit);
+h+='<div class="fg"><label>单位（下拉选择，可新增/删除）</label><select dk="unit" id="funit" data-cur="'+(row.unit||'')+'" onchange="onUnitSel(this)">'+_units.map(u=>'<option value="'+u+'"'+(u===row.unit?' selected':'')+'>'+u+'</option>').join('')+'<option value="__unit_new__">＋ 编辑/新增单位…</option><option value="__unit_del__">－ 删除单位…</option></select></div>';
 h+='<div class="fg"><label>计划数量</label><input type="number" dk="planQty" value="'+(row.planQty||0)+'" oninput="autoCalc()"></div>';
 h+='<div class="fg"><label>生产日期</label><input type="date" dk="prodDate" value="'+(row.prodDate||fd(new Date()))+'" oninput="autoCalc()"></div>';
 h+='<div class="fg"><label>配制量(L)</label><input type="number" step="any" dk="prepVol" value="'+(row.prepVol||0)+'" oninput="autoCalc()"></div>';
@@ -3079,7 +3090,7 @@ setTimeout(matFilterRows,0);
 
 function rBom(a){
 const prods=[...new Set(D.boms.map(b=>b.productName+'|'+(b.spec||'')))];
-a.innerHTML='<div class="card"><div class="ch"><h3>BOM物料清单管理（'+D.boms.length+'条物料 / '+prods.length+'个产品）</h3><a href="#shortage" style="font-size:12px;color:var(--primary);text-decoration:none;margin-left:12px">→ 生成缺料采购单</a><div class="ca"><button class="btn btnsm btnw" onclick="openBomImport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>导入BOM文件</button><button class="btn btnsm" onclick="bomFilter()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>筛选产品</button></div></div><div id="bomFilterBar" style="display:none;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border)"><select id="bomProdSel" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:300px" onchange="renderBomList()"><option value="">全部产品</option>'+prods.map(p=>{const[n,s]=p.split('|');return '<option value="'+p+'">'+n+(s?' ('+s+')':'')+'</option>'}).join('')+'</select></div><div id="bomList"></div></div>';
+a.innerHTML='<div class="card"><div class="ch"><h3>BOM物料清单管理（'+D.boms.length+'条物料 / '+prods.length+'个产品）</h3><a href="#shortage" style="font-size:12px;color:var(--primary);text-decoration:none;margin-left:12px">→ 生成缺料采购单</a><div class="ca"><button class="btn btnsm btnw" onclick="openBomImport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>导入BOM文件</button><button class="btn btnsm" onclick="bomFilter()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>筛选产品</button><button class="btn btnp btnsm" onclick="bf(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增产品BOM</button></div></div><div id="bomFilterBar" style="display:none;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border)"><select id="bomProdSel" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:300px" onchange="renderBomList()"><option value="">全部产品</option>'+prods.map(p=>{const[n,s]=p.split('|');return '<option value="'+p+'">'+n+(s?' ('+s+')':'')+'</option>'}).join('')+'</select></div><div id="bomList"></div></div>';
 renderBomList();
 }
 function bomFilter(){const bar=$('bomFilterBar');bar.style.display=bar.style.display==='none'?'block':'none';}
@@ -3093,7 +3104,8 @@ let h='';
 Object.keys(groups).forEach(key=>{
 const[name,spec]=key.split('|');
 const items=groups[key];
-h+='<div class="bom-group"><div class="bom-header"><span class="bom-title">'+name+'</span>'+(spec?'<span class="bom-spec">'+spec+'</span>':'')+'<span class="bom-count">'+items.length+'种物料</span></div>';
+const _esc=s=>String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+h+='<div class="bom-group"><div class="bom-header"><span class="bom-title">'+name+'</span>'+(spec?'<span class="bom-spec">'+spec+'</span>':'')+'<span class="bom-count">'+items.length+'种物料</span><a class="al" style="margin-left:auto;font-size:12px;background:rgba(255,255,255,.18);padding:2px 12px;border-radius:4px" onclick="bomAddMat(\''+_esc(name)+'\',\''+_esc(spec)+'\')">＋ 添加物料</a></div>';
 h+='<div class="tw"><table><thead><tr><th>货号</th><th>厂家</th><th>物料名称</th><th>采购规格</th><th>生产单位</th><th>生产用量/块</th><th>1L用量</th><th>1L成品数</th><th>操作</th></tr></thead><tbody>';
 items.forEach(b=>{
 const idx=D.boms.indexOf(b);
@@ -3107,8 +3119,19 @@ $('bomList').innerHTML=h;
 function bf(i){
 const edit=i!==null;const row=edit?D.boms[i]:{};
 let h='<div class="frow">';
+if(edit){
 h+='<div class="fg ffull"><label>产品名称</label><input type="text" dk="productName" value="'+(row.productName||'')+'"></div>';
 h+='<div class="fg ffull"><label>产品规格</label><input type="text" dk="spec" value="'+(row.spec||'')+'"></div>';
+h+='<div class="fg"><label>产品单位</label><input type="text" dk="unit" value="'+(row.unit||'')+'" placeholder="如 块/瓶/管"></div>';
+}else{
+const _bomProds=[...new Set((D.boms||[]).map(b=>b.productName).concat(D.extraProds||[]))].filter(Boolean);
+const _bomSpecs=[...new Set((D.boms||[]).map(b=>b.spec).concat(SPEC_EXTRA,D.extraSpecs||[]))].filter(Boolean);
+const _bomUnits=unitOptions();
+h+='<div class="fg ffull"><label>产品名称（可下拉选择或直接输入）</label><input list="dlBomProds" dk="productName" value="'+(row.productName||'')+'" placeholder="选择或输入产品名称"><datalist id="dlBomProds">'+_bomProds.map(x=>'<option value="'+x+'">').join('')+'</datalist></div>';
+h+='<div class="fg ffull"><label>产品规格（可下拉选择或直接输入）</label><input list="dlBomSpecs" dk="spec" value="'+(row.spec||'')+'" placeholder="如 90mm*10块/包"><datalist id="dlBomSpecs">'+_bomSpecs.map(x=>'<option value="'+x+'">').join('')+'</datalist></div>';
+h+='<div class="fg"><label>产品单位（可下拉选择或直接输入）</label><input list="dlBomUnits" dk="unit" value="'+(row.unit||'')+'" placeholder="如 块/瓶/管"><datalist id="dlBomUnits">'+_bomUnits.map(x=>'<option value="'+x+'">').join('')+'</datalist></div>';
+h+='<div class="fg ffull" style="font-size:12px;color:var(--text2);margin:2px 0 6px;border-top:1px dashed var(--border);padding-top:10px">填写该产品所需的第一条物料，保存后可在产品组内继续"添加物料"</div>';
+}
 h+='<div class="fg"><label>货号</label><input type="text" dk="itemNo" value="'+(row.itemNo||'')+'"></div>';
 h+='<div class="fg"><label>厂家</label><input type="text" dk="factory" value="'+(row.factory||'')+'"></div>';
 h+='<div class="fg ffull"><label>物料名称</label><input type="text" dk="materialName" value="'+(row.materialName||'')+'"></div>';
@@ -3125,10 +3148,40 @@ function bsave(i){
 const ins=$('mbody').querySelectorAll('[dk]');const item={};
 ins.forEach(inp=>{let v=inp.value;if(inp.type==='number')v=parseFloat(v)||0;item[inp.getAttribute('dk')]=v});
 if(i!==null)D.boms[i]={...D.boms[i],...item};
-else{item.id=D.boms.reduce((m,r)=>Math.max(m,r.id||0),0)+1;D.boms.push(item)}
+else{if(!item.materialName||!String(item.materialName).trim()){toast('请填写物料名称',true);return;}item.id=D.boms.reduce((m,r)=>Math.max(m,r.id||0),0)+1;D.boms.push(item)}
+// 自动同步到生产计划管理下拉选项（产品名称/规格/单位）
+if(item.spec&&String(item.spec).trim()){if(!D.extraSpecs)D.extraSpecs=[];if(!D.extraSpecs.includes(item.spec)){D.extraSpecs.push(item.spec);if(!SPEC_EXTRA.includes(item.spec))SPEC_EXTRA.push(item.spec);}}
+if(item.unit&&String(item.unit).trim()){if(!D.extraUnits)D.extraUnits=[];if(!unitOptions().includes(item.unit))D.extraUnits.push(item.unit);}
 saveData(D);cm();rp();toast(i!==null?'修改成功':'新增成功');
 }
 function bdel(i){if(!confirm('确定删除该物料？'))return;D.boms.splice(i,1);saveData(D);rp();toast('删除成功');}
+function bomAddMat(name,spec){
+let h='<div class="frow">';
+h+='<div class="fg ffull"><label>产品名称</label><input type="text" value="'+name+'" readonly style="background:var(--bg2)"></div>';
+h+='<div class="fg ffull"><label>产品规格</label><input type="text" value="'+(spec||'')+'" readonly style="background:var(--bg2)"></div>';
+h+='<div class="fg"><label>货号</label><input type="text" dk="itemNo"></div>';
+h+='<div class="fg"><label>厂家</label><input type="text" dk="factory"></div>';
+h+='<div class="fg ffull"><label>物料名称</label><input type="text" dk="materialName" placeholder="如 哥伦比亚基础培养基干粉"></div>';
+h+='<div class="fg"><label>采购规格</label><input type="text" dk="buySpec" placeholder="如 250g/瓶"></div>';
+h+='<div class="fg"><label>生产单位</label><input type="text" dk="prodUnit" placeholder="如 g"></div>';
+h+='<div class="fg"><label>生产用量/块</label><input type="number" step="any" dk="usagePer" value="0"></div>';
+h+='<div class="fg"><label>1L用量</label><input type="number" step="any" dk="lUsage" value="0"></div>';
+h+='<div class="fg"><label>1L成品数</label><input type="number" step="any" dk="lOutput" value="0"></div>';
+h+='<div class="fg ffull"><label>包装形式</label><input type="text" dk="package" placeholder="如 10块/包"></div>';
+h+='</div>';
+const esc=s=>String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+om('为「'+name+(spec?'（'+spec+'）':'')+'」添加物料',h,'<button class="btn" onclick="cm()">取消</button><button class="btn btnp" onclick="bomMatSave(\''+esc(name)+'\',\''+esc(spec)+'\')">保存物料</button>');
+}
+function bomMatSave(name,spec){
+const item={productName:name,spec:spec||''};
+const ins=$('mbody').querySelectorAll('[dk]');
+ins.forEach(inp=>{let v=inp.value;if(inp.type==='number')v=parseFloat(v)||0;item[inp.getAttribute('dk')]=v});
+if(!item.materialName||!String(item.materialName).trim()){toast('请填写物料名称',true);return;}
+item.id=D.boms.reduce((m,r)=>Math.max(m,r.id||0),0)+1;
+D.boms.push(item);
+if(item.spec&&String(item.spec).trim()){if(!D.extraSpecs)D.extraSpecs=[];if(!D.extraSpecs.includes(item.spec)){D.extraSpecs.push(item.spec);if(!SPEC_EXTRA.includes(item.spec))SPEC_EXTRA.push(item.spec);}}
+saveData(D);cm();rp();toast('物料已添加');
+}
 
 function rSop(a){
 crud(a,{title:'工序SOP要点管理（'+D.sops.length+'条）',data:()=>D.sops,cols:[
