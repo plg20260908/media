@@ -192,6 +192,21 @@ tr:hover{background:#f8fafc}
 .stat-summary .ss-item{font-size:13px;}
 .stat-summary .ss-item .ss-label{color:var(--text2);margin-right:6px;}
 .stat-summary .ss-item .ss-value{font-weight:600;color:var(--primary-dark);}
+/* ===== 多选下拉（统计筛选） ===== */
+.msel{position:relative;display:inline-block;min-width:190px}
+.msel-btn{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff;text-align:left;cursor:pointer;color:var(--text)}
+.msel-panel{position:absolute;top:110%;left:0;z-index:99;width:100%;min-width:230px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);display:none;padding:8px;box-sizing:border-box}
+.msel.open .msel-panel{display:block}
+.msel-search{width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;margin-bottom:6px}
+.msel-list{max-height:220px;overflow:auto}
+.msel-item{display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:12px;cursor:pointer;color:var(--text)}
+.msel-item:hover{background:var(--bg2)}
+.msel-ops{display:flex;justify-content:space-between;margin-top:6px}
+/* ===== 统计概览筛选 ===== */
+.ov-filter{display:flex;gap:8px;align-items:center;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.ov-filter select{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px}
+.ov-res{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+
 </style>
 </head>
 <body>
@@ -2711,7 +2726,7 @@ function removeCtxMenu(){document.querySelectorAll('.plan-ctx-menu').forEach(m=>
 
 // ===== 可搜索下拉（后置转换）=====
 function initSearchableSelects(ids){
-  const targetIds=ids||['pfProd','pfStatus','pfSpec','sfProd','sfCat','sfSpec'];
+  const targetIds=ids||['pfProd','pfStatus','pfSpec','sfCat'];
   targetIds.forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel||sel.dataset.searchable)return;
@@ -3226,6 +3241,24 @@ crud(a,{title:'工序SOP要点管理（'+D.sops.length+'条）',data:()=>D.sops,
 ]});
 }
 function fsop(){rp()}
+function ovYears(){const ys=new Set(['2026',String(new Date().getFullYear())]);(D.plans||[]).forEach(p=>{const m=String(p.prodDate||'').match(/^\d{4}/);if(m)ys.add(m[0]);});const arr=[...ys].sort().reverse();let h='<option value="">全部年份</option>';const cur=String(new Date().getFullYear());arr.forEach(y=>{h+='<option value="'+y+'"'+(y===cur?' selected':'')+'>'+y+'年</option>';});return h;}
+function ovWeeks(y){let h='<option value="">全部周次</option>';if(!y)return h;const st=new Date(y,0,1);const en=new Date(y,11,31);const dow=st.getDay()||7;st.setDate(st.getDate()-(dow-1));while(st<=en){const es=new Date(st);es.setDate(st.getDate()+6);h+='<option value="'+fd(st)+'~'+fd(es)+'">'+fd(st)+' ~ '+fd(es)+'</option>';st.setDate(st.getDate()+7);}return h;}
+function ovApply(rebuild){
+if(rebuild){const w=$('ovW');if(w)w.innerHTML=ovWeeks($('ovY')?$('ovY').value:'');}
+const box=$('ovResult');if(!box)return;
+const y=$('ovY')?$('ovY').value:'';const m=$('ovM')?$('ovM').value:'';const w=$('ovW')?$('ovW').value:'';
+const batchPlans=(D.plans||[]).filter(p=>p.prodDate&&p.productName&&p.spec);
+let list=batchPlans.slice();
+if(w){const r=w.split('~');list=list.filter(p=>p.prodDate>=r[0]&&p.prodDate<=r[1]);}
+else if(m&&y){list=list.filter(p=>String(p.prodDate||'').startsWith(y+'-'+m));}
+else if(y){list=list.filter(p=>String(p.prodDate||'').startsWith(y));}
+else if(m){list=list.filter(p=>String(p.prodDate||'').endsWith('-'+m));}
+const qty=p=>parseFloat(p.bzDone)||0;
+const sq=list.reduce((s,x)=>s+qty(x),0);
+const desc=[(y?y+'年':''),(m?m+'月':''),(w?w:'')].filter(Boolean).join(' / ')||'全部';
+box.innerHTML='<span>筛选：'+desc+'</span><span><b style="font-size:14px">'+list.length+'</b> 批次</span><span>生产量 <b style="font-size:14px">'+sq.toLocaleString()+'</b></span>';
+}
+function ovReset(){const y=$('ovY');if(y)y.value=String(new Date().getFullYear());const m=$('ovM');if(m)m.value='';ovApply(true);}
 function statOverview(){
 const now=new Date();const wk=wr(now);
 const mon=String(now.getFullYear())+'-'+String(now.getMonth()+1).padStart(2,'0');
@@ -3247,37 +3280,66 @@ const unitOf=n=>{const p=D.plans.find(x=>x.productName===n);return p?p.unit:'';}
 const agg=l=>{const m={};l.forEach(p=>{const n=p.productName||'未命名';if(!m[n])m[n]={name:n,batch:0,qty:0};m[n].batch++;m[n].qty+=qtyOf(p);});return Object.values(m).sort((a,b)=>b.qty-a.qty);};
 const wrk=agg(wl),mrl=agg(ml),yr2=agg(yl);
 const rankHtml=(rank,n)=>{if(!rank.length)return'<div style="padding:12px 0;font-size:12px;color:var(--text2)">暂无产量数据</div>';const max=rank.qty||1;let h='';rank.slice(0,n).forEach((r,i)=>{const pct=Math.max(2,Math.round(r.qty/max*100));h+='<div style="margin:7px 0"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+ (i+1)+'. '+r.name+'</span><span style="font-weight:600">'+r.qty.toLocaleString()+(unitOf(r.name)||'')+'（'+r.batch+'批）</span></div><div style="background:var(--bg2);border-radius:4px;height:10px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-dark));border-radius:4px"></div></div></div>';});return h;};
-return '<div class="card"><div class="ch"><h3>生产统计概览</h3><span class="tag tb">更新至 '+fd(now)+'（生产量=包装成品数）</span></div><div class="sgrid" style="grid-template-columns:repeat(4,1fr)"><div class="scard"><div class="sl">本周生产批次</div><div class="sv">'+wl.length+'</div></div><div class="scard g"><div class="sl">本周生产量</div><div class="sv">'+wq.toLocaleString()+'</div></div><div class="scard"><div class="sl">上周生产批次</div><div class="sv">'+lwl.length+'</div></div><div class="scard g"><div class="sl">上周生产量</div><div class="sv">'+lwq.toLocaleString()+'</div></div><div class="scard"><div class="sl">本月生产批次</div><div class="sv">'+ml.length+'</div></div><div class="scard g"><div class="sl">本月生产量</div><div class="sv">'+mq.toLocaleString()+'</div></div><div class="scard"><div class="sl">上月生产批次</div><div class="sv">'+lml.length+'</div></div><div class="scard g"><div class="sl">上月生产量</div><div class="sv">'+lmq.toLocaleString()+'</div></div><div class="scard"><div class="sl">本年度生产批次</div><div class="sv">'+yl.length+'</div></div><div class="scard g"><div class="sl">本年度生产量</div><div class="sv">'+yq.toLocaleString()+'</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:16px"><div><h4 style="font-size:13px;color:var(--primary-dark);border-left:4px solid var(--primary);padding-left:8px;margin:0 0 8px">本周品种产量排行 TOP5</h4>'+rankHtml(wrk,5)+'</div><div><h4 style="font-size:13px;color:var(--primary-dark);border-left:4px solid var(--accent);padding-left:8px;margin:0 0 8px">本月品种产量排行 TOP10</h4>'+rankHtml(mrl,10)+'</div><div><h4 style="font-size:13px;color:var(--primary);border-left:4px solid var(--accent);padding-left:8px;margin:0 0 8px">本年度品种产量排行 TOP10</h4>'+rankHtml(yr2,10)+'</div></div></div>';
+return '<div class="card"><div class="ch"><h3>生产统计概览</h3><span class="tag tb">更新至 '+fd(now)+'（生产量=包装成品数）</span></div><div class="ov-filter"><span style="font-size:12px;color:var(--text2);white-space:nowrap">筛选：</span><select id="ovY" onchange="ovApply(true)">'+ovYears()+'</select><select id="ovM" onchange="ovApply(false)"><option value="">全部月份</option>'+['01','02','03','04','05','06','07','08','09','10','11','12'].map(mo=>'<option value="'+mo+'">'+mo+'月</option>').join('')+'</select><select id="ovW" onchange="ovApply(false)">'+ovWeeks(String(new Date().getFullYear()))+'</select><button class="btn btnsm" onclick="ovReset()">重置</button></div><div id="ovResult" style="padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);display:flex;gap:18px;flex-wrap:wrap"></div><div class="sgrid" style="grid-template-columns:repeat(4,1fr)"><div class="scard"><div class="sl">本周生产批次</div><div class="sv">'+wl.length+'</div></div><div class="scard g"><div class="sl">本周生产量</div><div class="sv">'+wq.toLocaleString()+'</div></div><div class="scard"><div class="sl">上周生产批次</div><div class="sv">'+lwl.length+'</div></div><div class="scard g"><div class="sl">上周生产量</div><div class="sv">'+lwq.toLocaleString()+'</div></div><div class="scard"><div class="sl">本月生产批次</div><div class="sv">'+ml.length+'</div></div><div class="scard g"><div class="sl">本月生产量</div><div class="sv">'+mq.toLocaleString()+'</div></div><div class="scard"><div class="sl">上月生产批次</div><div class="sv">'+lml.length+'</div></div><div class="scard g"><div class="sl">上月生产量</div><div class="sv">'+lmq.toLocaleString()+'</div></div><div class="scard"><div class="sl">本年度生产批次</div><div class="sv">'+yl.length+'</div></div><div class="scard g"><div class="sl">本年度生产量</div><div class="sv">'+yq.toLocaleString()+'</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:16px"><div><h4 style="font-size:13px;color:var(--primary-dark);border-left:4px solid var(--primary);padding-left:8px;margin:0 0 8px">本周品种产量排行 TOP5</h4>'+rankHtml(wrk,5)+'</div><div><h4 style="font-size:13px;color:var(--primary-dark);border-left:4px solid var(--accent);padding-left:8px;margin:0 0 8px">本月品种产量排行 TOP10</h4>'+rankHtml(mrl,10)+'</div><div><h4 style="font-size:13px;color:var(--primary);border-left:4px solid var(--accent);padding-left:8px;margin:0 0 8px">本年度品种产量排行 TOP10</h4>'+rankHtml(yr2,10)+'</div></div></div>';
 }
-let statF={prod:'',cat:'',spec:'',from:'',to:''};
+let statF={prods:[],cat:'',specs:[],from:'',to:''};
 
 function expData(){try{const blob=new Blob([JSON.stringify(D)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='生产数据备份_'+fd(new Date())+'.json';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(u);a.remove();},2000);toast('数据已导出为JSON文件');}catch(e){toast('导出失败：'+e.message,true);}}
 function impData(){try{const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=()=>{const f=inp.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||typeof d!=='object'||!Array.isArray(d.plans)){toast('文件格式不正确，请选择本平台导出的JSON备份',true);return;}D=d;saveData(D);rp();toast('数据导入成功');}catch(e){toast('导入失败：'+e.message,true);}};rd.readAsText(f);};inp.click();}catch(e){toast('导入失败：'+e.message,true);}}
 function rStat(a){
 alignStats();
 const prods=[...new Set(D.stats.map(s=>s.productName))].filter(Boolean).sort();
-a.innerHTML=statOverview()+'<div class="card"><div class="ch"><h3>生产统计管理</h3><div class="ca"><button class="btn btnsm btnw" onclick="syncFromPlan()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>从生产计划同步</button><button class="btn btnp btnsm" onclick="sf(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增</button></div></div><div class="st-filter" style="display:flex;gap:8px;align-items:center;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:12px;color:var(--text2);white-space:nowrap">筛选：</span><select id="sfProd" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:190px" onchange="renderStatTable()"><option value="">全部产品</option>'+prods.map(p=>'<option value="'+p+'"'+(statF.prod===p?' selected':'')+'>'+p+'</option>').join('')+'</select><select id="sfCat" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderStatTable()"><option value="">全部类别</option>'+['一类产品','二类产品','科研试剂'].map(c=>'<option value="'+c+'"'+(statF.cat===c?' selected':'')+'>'+c+'</option>').join('')+'</select><select id="sfSpec" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:160px" onchange="renderStatTable()"><option value="">全部规格</option>'+[...new Set(D.stats.map(s=>s.spec))].filter(Boolean).sort().map(s=>'<option value="'+s+'"'+(statF.spec===s?' selected':'')+'>'+s+'</option>').join('')+'</select><input type="date" id="sfFrom" value="'+statF.from+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderStatTable()" title="生产日期起"><span style="color:var(--text2)">~</span><input type="date" id="sfTo" value="'+statF.to+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderStatTable()" title="生产日期止"><button class="btn btnsm" onclick="statResetFilter()">重置</button></div><div id="statTable"></div></div>';
+const specs=[...new Set(D.stats.map(s=>s.spec))].filter(Boolean).sort();
+a.innerHTML=statOverview()+'<div class="card"><div class="ch"><h3>生产统计管理</h3><div class="ca"><button class="btn btnsm btnw" onclick="syncFromPlan()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>从生产计划同步</button><button class="btn btnp btnsm" onclick="sf(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>新增</button></div></div><div class="st-filter" style="display:flex;gap:8px;align-items:center;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:12px;color:var(--text2);white-space:nowrap">筛选：</span>'+mselHTML('sfProdMSel')+'<select id="sfCat" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderStatTable()"><option value="">全部类别</option>'+['一类产品','二类产品','科研试剂'].map(c=>'<option value="'+c+'"'+(statF.cat===c?' selected':'')+'>'+c+'</option>').join('')+'</select>'+mselHTML('sfSpecMSel')+'<input type="date" id="sfFrom" value="'+statF.from+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderStatTable()" title="生产日期起"><span style="color:var(--text2)">~</span><input type="date" id="sfTo" value="'+statF.to+'" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" onchange="renderStatTable()" title="生产日期止"><button class="btn btnsm" onclick="statResetFilter()">重置</button></div><div id="statTable"></div></div>';
+mselInit('sfProdMSel',prods,statF.prods);
+mselInit('sfSpecMSel',specs,statF.specs);
+ovApply();
 renderStatTable();
 initSearchableSelects();
 }
-function statResetFilter(){statF={prod:'',cat:'',spec:'',from:'',to:''};rp();}
+function statResetFilter(){statF={prods:[],cat:'',specs:[],from:'',to:''};rp();}
+function mselHTML(id,ph){return '<div class="msel" id="'+id+'"><button type="button" class="msel-btn" onclick="mselToggle(\''+id+'\')">'+(ph||'请选择（可多选）')+'</button><div class="msel-panel"><input type="text" class="msel-search" placeholder="输入关键字搜索" oninput="mselFilter(\''+id+'\')"><div class="msel-list"></div><div class="msel-ops"><button type="button" class="btn btnsm" onclick="mselClear(\''+id+'\')">清除</button><button type="button" class="btn btnp btnsm" onclick="mselClose(\''+id+'\')">确定</button></div></div></div>';}
+function mselVal(id){const el=document.getElementById(id);if(!el)return[];const arr=[];el.querySelectorAll('.msel-item input:checked').forEach(ch=>arr.push(ch.value));return arr;}
+function mselInit(id,opts,selected){
+const el=document.getElementById(id);if(!el)return;
+const sel=selected||[];
+el.dataset.opts=JSON.stringify(opts||[]);
+el.dataset.sel=JSON.stringify(sel);
+const btn=el.querySelector('.msel-btn');
+btn.textContent=sel.length?('已选 '+sel.length+' 项'):(id.indexOf('Spec')>=0?'全部规格（可多选）':'全部产品（可多选）');
+mselDraw(el,'');
+}
+function mselDraw(el,filter){
+const opts=JSON.parse(el.dataset.opts||'[]');
+const sel=JSON.parse(el.dataset.sel||'[]');
+const list=el.querySelector('.msel-list');
+const f=(filter||'').toLowerCase();
+list.innerHTML=opts.filter(o=>!f||String(o).toLowerCase().includes(f)).map(o=>'<label class="msel-item"><input type="checkbox" value="'+o+'"'+(sel.includes(o)?' checked':'')+' onchange="mselCount(\''+el.id+'\')">'+o+'</label>').join('')||'<div style="font-size:12px;color:var(--text2);padding:4px">无匹配项</div>';
+}
+function mselCount(id){const el=document.getElementById(id);if(!el)return;const sel=[];el.querySelectorAll('.msel-item input:checked').forEach(ch=>sel.push(ch.value));el.dataset.sel=JSON.stringify(sel);const btn=el.querySelector('.msel-btn');btn.textContent=sel.length?('已选 '+sel.length+' 项'):(id.indexOf('Spec')>=0?'全部规格（可多选）':'全部产品（可多选）');}
+function mselToggle(id){const el=document.getElementById(id);if(!el)return;el.classList.toggle('open');}
+function mselFilter(id){const el=document.getElementById(id);if(!el)return;mselDraw(el,el.querySelector('.msel-search').value);}
+function mselClose(id){const el=document.getElementById(id);if(!el)return;el.classList.remove('open');renderStatTable();}
+function mselClear(id){const el=document.getElementById(id);if(!el)return;el.dataset.sel='[]';mselCount(id);renderStatTable();}
 function renderStatTable(){
 const box=$('statTable');if(!box)return;
-if($('sfProd')){statF.prod=$('sfProd').value;statF.cat=$('sfCat').value;statF.spec=$('sfSpec').value;statF.from=$('sfFrom').value;statF.to=$('sfTo').value;}
+if($('sfCat')){statF.cat=$('sfCat').value;statF.from=$('sfFrom').value;statF.to=$('sfTo').value;}
+statF.prods=mselVal('sfProdMSel');statF.specs=mselVal('sfSpecMSel');
 let list=D.stats.slice().sort((a,b)=>String(b.prodDate||'').localeCompare(String(a.prodDate||''))||String(a.productName||'').localeCompare(String(b.productName||''))||String(a.spec||'').localeCompare(String(b.spec||''))||String(b.batchNo||'').localeCompare(String(a.batchNo||'')));
-if(statF.prod)list=list.filter(s=>s.productName===statF.prod);
+if(statF.prods&&statF.prods.length)list=list.filter(s=>statF.prods.includes(s.productName));
 if(statF.cat)list=list.filter(s=>s.category===statF.cat);
-if(statF.spec)list=list.filter(s=>s.spec===statF.spec);
+if(statF.specs&&statF.specs.length)list=list.filter(s=>statF.specs.includes(s.spec));
 if(statF.from)list=list.filter(s=>s.prodDate>=statF.from);
 if(statF.to)list=list.filter(s=>s.prodDate<=statF.to);
 // 计算筛选汇总
 const _sumBatch=list.length;
 const _sumPlan=list.reduce((s,x)=>s+(parseFloat(x.planQty)||0),0);
 const _sumActual=list.reduce((s,x)=>s+(parseFloat(x.actualQty)||0),0);
-const _sumHtml=(statF.prod||statF.cat||statF.spec||statF.from||statF.to)?('<div class="stat-summary"><div class="ss-item"><span class="ss-label">筛选结果：</span><span class="ss-value">'+_sumBatch+' 批次</span></div><div class="ss-item"><span class="ss-label">计划产量合计：</span><span class="ss-value">'+_sumPlan.toLocaleString()+'</span></div><div class="ss-item"><span class="ss-label">实际产量合计：</span><span class="ss-value">'+_sumActual.toLocaleString()+'</span></div>'+(statF.prod?'<div class="ss-item"><span class="ss-label">产品：</span><span class="ss-value">'+statF.prod+'</span></div>':'')+'</div>'):'';
-box.innerHTML=_sumHtml+'<div class="tw"><table><thead><tr><th>生产日期</th><th>产品名称</th><th>规格</th><th>单位</th><th>类别</th><th>计划产量</th><th>实际产量</th><th>合格率(%)</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
-(list.length===0?'<tr><td colspan="10"><div class="empty">没有符合筛选条件的统计数据</div></td></tr>':
-list.map(s=>{const idx=D.stats.indexOf(s);return '<tr><td><strong>'+s.prodDate+'</strong></td><td>'+s.productName+'</td><td style="font-size:11.5px">'+(s.spec||'-')+'</td><td>'+(s.unit||'-')+'</td><td>'+ct(s.category)+'</td><td>'+s.planQty+'</td><td>'+s.actualQty+'</td><td style="color:'+(s.passRate>=99?'var(--success)':s.passRate>=95?'var(--warning)':'var(--danger)')+'">'+s.passRate+'%</td><td>'+st(s.status)+'</td><td><a class="al" onclick="sf('+idx+')">编辑</a><a class="al d" onclick="sdel('+idx+')">删除</a></td></tr>';}).join(''))+
+const _sumPrep=list.reduce((s,x)=>s+(parseFloat(x.prepVol)||0),0);
+const _sumHtml=(statF.prods&&statF.prods.length||statF.cat||statF.specs&&statF.specs.length||statF.from||statF.to)?('<div class="stat-summary"><div class="ss-item"><span class="ss-label">筛选结果：</span><span class="ss-value">'+_sumBatch+' 批次</span></div><div class="ss-item"><span class="ss-label">计划产量合计：</span><span class="ss-value">'+_sumPlan.toLocaleString()+'</span></div><div class="ss-item"><span class="ss-label">实际产量合计：</span><span class="ss-value">'+_sumActual.toLocaleString()+'</span></div><div class="ss-item"><span class="ss-label">配制量合计：</span><span class="ss-value">'+_sumPrep.toLocaleString()+' L</span></div>'+(statF.prods&&statF.prods.length?'<div class="ss-item"><span class="ss-label">产品：</span><span class="ss-value">已选'+statF.prods.length+'个</span></div>':'')+(statF.specs&&statF.specs.length?'<div class="ss-item"><span class="ss-label">规格：</span><span class="ss-value">已选'+statF.specs.length+'个</span></div>':'')+'</div>'):'';
+box.innerHTML=_sumHtml+'<div class="tw"><table><thead><tr><th>生产日期</th><th>产品名称</th><th>规格</th><th>单位</th><th>配制量</th><th>类别</th><th>计划产量</th><th>实际产量</th><th>合格率(%)</th><th>状态</th><th>操作</th></tr></thead><tbody>'+
+(list.length===0?'<tr><td colspan="11"><div class="empty">没有符合筛选条件的统计数据</div></td></tr>':
+list.map(s=>{const idx=D.stats.indexOf(s);return '<tr><td><strong>'+s.prodDate+'</strong></td><td>'+s.productName+'</td><td style="font-size:11.5px">'+(s.spec||'-')+'</td><td>'+(s.unit||'-')+'</td><td>'+(s.prepVol||0)+'</td><td>'+ct(s.category)+'</td><td>'+s.planQty+'</td><td>'+s.actualQty+'</td><td style="color:'+(s.passRate>=99?'var(--success)':s.passRate>=95?'var(--warning)':'var(--danger)')+'">'+s.passRate+'%</td><td>'+st(s.status)+'</td><td><a class="al" onclick="sf('+idx+')">编辑</a><a class="al d" onclick="sdel('+idx+')">删除</a></td></tr>';}).join(''))+
 '</tbody></table></div>';
 }
 function alignStats(){
@@ -3295,7 +3357,7 @@ if(exist.planQty!==p.planQty||String(exist.actualQty)!==String(parseFloat(p.bzDo
 exist.planQty=p.planQty;exist.actualQty=parseFloat(p.bzDone)||0;exist.status=p.status;
 exist.prodDate=p.prodDate;exist.category=sopOf(p.productName);exist.passRate=passRate;exist.spec=p.spec||'';exist.unit=p.unit||'';
 }else{
-D.stats.push({id:D.stats.reduce((m,r)=>Math.max(m,r.id||0),0)+1,batchNo,productName:p.productName,category:sopOf(p.productName),prodDate:p.prodDate,planQty:p.planQty,actualQty:parseFloat(p.bzDone)||0,passRate,status:p.status,spec:p.spec||'',unit:p.unit||''});added++;
+D.stats.push({id:D.stats.reduce((m,r)=>Math.max(m,r.id||0),0)+1,batchNo,productName:p.productName,category:sopOf(p.productName),prodDate:p.prodDate,planQty:p.planQty,actualQty:parseFloat(p.bzDone)||0,passRate,status:p.status,spec:p.spec||'',unit:p.unit||'',prepVol:p.prepVol||0});added++;
 }
 });
 const before=D.stats.length;
@@ -3320,6 +3382,7 @@ h+='<div class="fg"><label>规格</label><input type="text" dk="spec" value="'+(
 h+='<div class="fg"><label>单位</label><input type="text" dk="unit" value="'+(row.unit||'')+'" placeholder="如 块"></div>';
 h+='<div class="fg"><label>产品类别</label><select dk="category"><option value="一类产品"'+(row.category==='一类产品'?' selected':'')+'>一类产品</option><option value="二类产品"'+(row.category==='二类产品'?' selected':'')+'>二类产品</option><option value="科研试剂"'+(row.category==='科研试剂'?' selected':'')+'>科研试剂</option></select></div>';
 h+='<div class="fg"><label>生产日期</label><input type="date" dk="prodDate" value="'+(row.prodDate||'')+'"></div>';
+h+='<div class="fg"><label>配制量(L)</label><input type="number" dk="prepVol" value="'+(row.prepVol||0)+'"></div>';
 h+='<div class="fg"><label>计划产量</label><input type="number" dk="planQty" value="'+(row.planQty||0)+'" oninput="autoCalc()"></div>';
 h+='<div class="fg"><label>实际产量</label><input type="number" dk="actualQty" value="'+(row.actualQty||0)+'"></div>';
 h+='<div class="fg"><label>合格率(%)</label><input type="number" step="0.1" dk="passRate" value="'+(row.passRate||0)+'"></div>';
